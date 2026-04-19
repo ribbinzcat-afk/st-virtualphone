@@ -1,24 +1,28 @@
 /* --- Floating Button --- */
 #st-phone-fab {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    /* เปลี่ยนจาก bottom/right เป็น top/left เพื่อให้คำนวณตำแหน่งตอนลากได้ง่าย */
+    top: calc(100vh - 80px);
+    left: calc(100vw - 80px);
     width: 60px;
     height: 60px;
     background-color: #3b82f6;
     border-radius: 50%;
     box-shadow: 0 4px 10px rgba(0,0,0,0.3);
-    cursor: pointer;
-    z-index: 9999; /* ให้อยู่บนสุด */
+    cursor: grab; /* เปลี่ยนเคอร์เซอร์เป็นรูปมือตอนชี้ */
+    z-index: 9999;
     display: flex;
     justify-content: center;
     align-items: center;
     font-size: 24px;
     transition: transform 0.2s;
+    user-select: none; /* ห้ามคลุมดำข้อความตอนลาก */
+    touch-action: none; /* ป้องกันหน้าจอเลื่อนตอนลากบนมือถือ */
 }
 
-#st-phone-fab:hover {
-    transform: scale(1.1);
+#st-phone-fab:active {
+    cursor: grabbing; /* รูปมือตอนกำลังลาก */
+    transform: scale(0.95); /* หดนิดนึงตอนกดลาก */
 }
 
 /* อนิเมชันสั่นเวลามีแจ้งเตือน */
