@@ -343,47 +343,6 @@ function triggerNotification(appId) {
     }
 }
 
-function handleNewMessage(messageId) {
-    // ดึง Context ของแชทปัจจุบัน
-    const context = getContext();
-    const chat = context.chat;
-
-    // หาข้อความล่าสุดจาก messageId
-    const msgElement = document.querySelector(`.mes[mesid="${messageId}"] .mes_text`);
-    if (!msgElement) return;
-
-    let text = msgElement.innerHTML;
-    let hasNotification = false;
-
-    // 1. ดักจับแอป Line (รูปแบบ: [Line|ชื่อคนส่ง|ข้อความ])
-    const lineRegex = /\[Line\|(.*?)\|(.*?)\]/gi;
-    text = text.replace(lineRegex, (match, sender, message) => {
-        console.log(`📱 ได้รับข้อความ Line จาก ${sender}: ${message}`);
-
-        // TODO: ใน Phase หน้า เราจะเอาข้อมูลนี้ไปยัดใส่ UI ของแอป Line
-
-        hasNotification = true;
-        triggerNotification('line');
-
-        // Return ค่าว่าง เพื่อ "ซ่อน" ข้อความนี้จากหน้าแชทหลัก
-        return `<span style="display:none;">${match}</span>`;
-    });
-
-    // 2. ดักจับแอป Phone (รูปแบบ: [Call|ชื่อคนโทร])
-    const callRegex = /\[Call\|(.*?)\]/gi;
-    text = text.replace(callRegex, (match, caller) => {
-        console.log(`📞 มีสายเข้าจาก: ${caller}`);
-        hasNotification = true;
-        triggerNotification('phone');
-        return `<span style="display:none;">${match}</span>`;
-    });
-
-    // ถ้ามีการแก้ไขข้อความ ให้เขียนทับกลับไปที่หน้าจอแชท
-    if (hasNotification) {
-        msgElement.innerHTML = text;
-    }
-}
-
 // --- ฟังก์ชันทำให้ปุ่มลากได้ (Draggable) ---
 function makeDraggable(element) {
     let currentX;
