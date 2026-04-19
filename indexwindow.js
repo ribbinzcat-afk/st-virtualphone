@@ -1206,7 +1206,8 @@ let callTimerInterval;
 let callSeconds = 0;
 
 // เมื่อมีสายเข้า
-function triggerIncomingCall(callerName) {
+// เมื่อมีสายเข้า (AI โทรมา)
+window.triggerIncomingCall = function(callerName) {
     currentCallerName = callerName;
     const avatarUrl = getAvatarUrl(false, callerName);
 
@@ -1214,14 +1215,15 @@ function triggerIncomingCall(callerName) {
     document.getElementById('incoming-name').innerText = callerName;
     document.getElementById('incoming-avatar').style.backgroundImage = `url('${avatarUrl}')`;
 
-    // สลับหน้าจอไปที่สายเรียกเข้า
+    // สลับหน้าจอ: โชว์หน้าสายเรียกเข้า และ **ซ่อนหน้าประวัติการโทร**
     document.getElementById('phone-incoming-view').style.display = 'flex';
     document.getElementById('phone-active-view').style.display = 'none';
+    document.getElementById('phone-history-view').style.display = 'none'; // <--- เพิ่มบรรทัดนี้ (ซ่อนหน้าประวัติ)
 
-    // เปิดแอปโทรศัพท์ขึ้นมาอัตโนมัติ (เด้งขึ้นมาเลยเพื่อให้รู้ว่ามีสายเข้า)
+    // เปิดแอปโทรศัพท์ขึ้นมาอัตโนมัติ
     if (!isPhoneOpen) togglePhone();
     openApp('phone', 'Phone');
-}
+};
 
 window.initiateCallOut = function() {
     const context = getContext();
@@ -1247,17 +1249,20 @@ window.initiateCallOut = function() {
 };
 
 // แก้ไขฟังก์ชัน acceptCall (ตอนเรารับสาย) ให้เซ็ตภาพพื้นหลังด้วย
+// กดรับสาย
 window.acceptCall = function() {
     isCallActive = true;
     const avatarUrl = getAvatarUrl(false, currentCallerName);
 
     const activeView = document.getElementById('phone-active-view');
-    activeView.style.backgroundImage = `url('${avatarUrl}')`; // พื้นหลังเต็มจอ
+    activeView.style.backgroundImage = `url('${avatarUrl}')`;
     document.getElementById('active-name').innerText = currentCallerName;
     document.getElementById('active-avatar').style.backgroundImage = `url('${avatarUrl}')`;
     document.getElementById('phone-transcript').innerHTML = '<div style="text-align: center; color: #ccc; font-size: 12px; margin-top: 10px;">Call connected.</div>';
 
+    // สลับหน้าจอ: โชว์หน้าคุยสาย และ **ซ่อนหน้าอื่นๆ**
     document.getElementById('phone-incoming-view').style.display = 'none';
+    document.getElementById('phone-history-view').style.display = 'none'; // <--- เพิ่มบรรทัดนี้เพื่อความชัวร์
     activeView.style.display = 'flex';
 
     callSeconds = 0;
@@ -1281,8 +1286,13 @@ window.endCall = function() {
 
 // กดตัดสาย
 window.declineCall = function() {
-    // ปิดแอป
+    // ปิดแอปโทรศัพท์
     document.getElementById('window-phone').style.display = 'none';
+
+    // รีเซ็ตหน้าจอให้กลับไปหน้าประวัติการโทร (เผื่อเปิดแอปมาใหม่คราวหน้า)
+    document.getElementById('phone-incoming-view').style.display = 'none';
+    document.getElementById('phone-active-view').style.display = 'none';
+    document.getElementById('phone-history-view').style.display = 'flex'; // <--- คืนค่าหน้าประวัติ
 
     // ส่ง Prompt บอก AI ว่าเราตัดสาย
     sendHiddenPrompt(`[System: ผู้ใช้กดตัดสายโทรศัพท์จาก ${currentCallerName}]`);
