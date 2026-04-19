@@ -168,8 +168,10 @@ const apps = [
     { id: 'phone', name: 'Phone', icon: '📞', color: '#34C759' },
     { id: 'music', name: 'Music', icon: '🎵', color: '#FF2D55' },
     { id: 'ig', name: 'Instagram', icon: '📸', color: '#E1306C' },
+    { id: 'twitter', name: 'Twitter', icon: '🐦', color: '#1DA1F2' }, 
     { id: 'settings', name: 'Settings', icon: '⚙️', color: '#8E8E93' }
 ];
+
 
 function createPhoneUI() {
     try {
@@ -411,6 +413,29 @@ function createPhoneUI() {
                         <textarea id="ig-caption-input" class="ig-textarea" placeholder="Write a caption... (AI จะเห็นข้อความนี้)"></textarea>
                         <textarea id="ig-hidden-desc-input" class="ig-textarea" placeholder="Image Description (อธิบายรูปให้ AI ฟัง แต่ไม่โชว์หน้าจอ)"></textarea>
                     </div>
+                </div>
+            `;
+        } else if (app.id === 'twitter') {
+            appWindow.innerHTML = `
+                <div class="st-app-header">
+                    <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
+                    <div>Twitter</div>
+                    <div style="width: 20px;"></div>
+                </div>
+                <div class="st-app-content" id="content-twitter" style="position: relative;">
+                    <div id="tw-empty-state" style="text-align: center; padding: 20px; color: #71767b;">No tweets yet.</div>
+
+                    <!-- ปุ่มสร้างทวีต -->
+                    <div class="tw-fab-create" onclick="openTwitterCreate()">➕</div>
+                </div>
+
+                <!-- หน้าต่างสร้างทวีต -->
+                <div id="tw-create-modal">
+                    <div class="tw-create-header">
+                        <div style="cursor: pointer; color: white;" onclick="closeTwitterCreate()">Cancel</div>
+                        <div class="tw-reply-btn" onclick="submitTwitterPost()">Post</div>
+                    </div>
+                    <textarea id="tw-input" class="tw-textarea" placeholder="What's happening?"></textarea>
                 </div>
             `;
         } else {
@@ -721,6 +746,30 @@ function handleNewMessage(messageId) {
             triggerNotification('ig');
         }
         return `<span style="display:none;" class="hidden-ig-msg">${match}</span>`;
+    });
+
+        // 6. ดักจับ Twitter (โพสต์ & รีพลาย)
+    // แบบที่ 1: AI สร้างทวีตใหม่ -> [Twitter|post|ข้อความ]
+    const twPostRegex = /\[Twitter\|post\|(.*?)\]/gi;
+    text = text.replace(twPostRegex, (match, twText) => {
+        const sender = getContext().name2 || "Unknown";
+        renderTwitterPostUI(sender, twText.trim());
+        hasNotification = true;
+        triggerNotification('twitter');
+        return `<span style="display:none;" class="hidden-tw-msg">${match}</span>`;
+    });
+
+    // แบบที่ 2: AI รีพลายทวีต -> [Twitter|reply|ข้อความ]
+    const twReplyRegex = /\[Twitter\|reply\|(.*?)\]/gi;
+    text = text.replace(twReplyRegex, (match, replyText) => {
+        const sender = getContext().name2 || "Unknown";
+        if (latestTweetId) {
+            saveTwitterReply(latestTweetId, { name: sender, text: replyText.trim() });
+            addTwitterReplyToUI_NoSave(latestTweetId, sender, replyText.trim());
+            hasNotification = true;
+            triggerNotification('twitter');
+        }
+        return `<span style="display:none;" class="hidden-tw-msg">${match}</span>`;
     });
 
     // ถ้ามีการแก้ไขข้อความ ให้เขียนทับกลับไปที่หน้าจอแชทหลัก
@@ -1588,6 +1637,173 @@ window.addCommentToUI = function(postId, name, text) {
     saveIGCommentToStorage(postId, { name: name, text: text });
     addCommentToUI_NoSave(postId, name, text);
 };
+
+// ==========================================
+// --- ระบบแอป Twitter ---
+// ==========================================
+const TW_STORAGE_KEY = 'st_virtualphone_tw_history';
+let latestTweetId = "";
+
+// --- ระบบ Storage ---
+function getAllTwitterHistory() {
+    const data = localStorage.getItem(TW_STORAGE_KEY);
+    return data ? JSON.parse(data) : {};
+}
+
+function loadTwitterHistoryForCurrentChar() {
+    const context = getContext();
+    const charId = context.characterId;
+    if (!charId) return;
+
+    const allHistory = getAllTwitterHistory();
+    const charTweets = allHistory[charId] || [];
+
+    const contentTW = document.getElementById('content-twitter');
+    if (!contentTW) return;
+
+    // ล้างหน้าจอ ยกเว้นปุ่มสร้างทวีต
+    const fabBtn = contentTW.querySelector('.tw-fab-create');
+    contentTW.innerHTML = '';
+    if (fabBtn) contentTW.appendChild(fabBtn);
+
+    if (charTweets.length === 0) {
+        const emptyState = document.createElement('div');
+        emptyState.id = 'tw-empty-state';
+        emptyState.style.cssText = "text-align: center; padding: 20px; color: #71767b;";
+        emptyState.innerText = "No tweets yet.";
+        contentTW.appendChild(emptyState);
+        return;
+    }
+
+    charTweets.forEach(tweet => renderTwitterUI_FromHistory(tweet));
+}
+
+function saveTwitterPost(tweetData) {
+    const charId = getContext().characterId;
+    if (!charId) return;
+    const allHistory = getAllTwitterHistory();
+    if (!allHistory[charId]) allHistory[charId] = [];
+    allHistory[charId].unshift(tweetData);
+    localStorage.setItem(TW_STORAGE_KEY, JSON.stringify(allHistory));
+}
+
+function saveTwitterReply(tweetId, replyData) {
+    const charId = getContext().characterId;
+    if (!charId) return;
+    const allHistory = getAllTwitterHistory();
+    if (!allHistory[charId]) return;
+    const index = allHistory[charId].findIndex(t => t.tweetId === tweetId);
+    if (index !== -1) {
+        if (!allHistory[charId][index].replies) allHistory[charId][index].replies = [];
+        allHistory[charId][index].replies.push(replyData);
+        localStorage.setItem(TW_STORAGE_KEY, JSON.stringify(allHistory));
+    }
+}
+
+// --- ระบบ UI ผู้ใช้สร้างทวีต ---
+window.openTwitterCreate = function() { document.getElementById('tw-create-modal').style.display = 'flex'; };
+window.closeTwitterCreate = function() { document.getElementById('tw-create-modal').style.display = 'none'; document.getElementById('tw-input').value = ""; };
+
+window.submitTwitterPost = function() {
+    const text = document.getElementById('tw-input').value.trim();
+    if (!text) return;
+
+    const myName = getContext().name1 || "Me";
+
+    // โชว์หน้าจอ & เซฟ
+    renderTwitterPostUI(myName, text);
+
+    // ส่ง Prompt หา AI
+    sendHiddenPrompt(`[Twitter Post โดย ${myName}: "${text}"] <span style="display:none;">(OOC: คุณสามารถตอบกลับทวีตนี้ได้โดยพิมพ์ [Twitter|reply|ข้อความ])</span>`);
+    closeTwitterCreate();
+};
+
+// --- ฟังก์ชันหลักสร้าง UI ทวีต ---
+window.renderTwitterPostUI = function(senderName, text) {
+    const tweetId = 'tw_' + Date.now();
+    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const tweetData = { tweetId, senderName, text, timeString, replies: [] };
+    saveTwitterPost(tweetData);
+    renderTwitterUI_FromHistory(tweetData);
+    latestTweetId = tweetId;
+};
+
+window.renderTwitterUI_FromHistory = function(tweetData) {
+    const contentTW = document.getElementById('content-twitter');
+    const emptyState = document.getElementById('tw-empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+
+    latestTweetId = tweetData.tweetId;
+    const avatarUrl = getAvatarUrl(tweetData.senderName === (getContext().name1 || "Me"), tweetData.senderName);
+    const username = "@" + tweetData.senderName.replace(/\s+/g, '').toLowerCase();
+
+    const twDiv = document.createElement('div');
+    twDiv.className = 'tw-post';
+    twDiv.id = tweetData.tweetId;
+
+    twDiv.innerHTML = `
+        <div class="tw-post-header">
+            <div class="tw-avatar" style="background-image: url('${avatarUrl}');"></div>
+            <div class="tw-name-group">
+                <div class="tw-display-name">${tweetData.senderName}</div>
+                <div class="tw-username">${username} • ${tweetData.timeString}</div>
+            </div>
+        </div>
+        <div class="tw-text">${tweetData.text}</div>
+        <div class="tw-actions">
+            <div class="tw-action-icon">💬 Reply</div>
+            <div class="tw-action-icon">🔄 RT</div>
+            <div class="tw-action-icon" onclick="this.classList.toggle('liked');">🤍 Like</div>
+        </div>
+        <div class="tw-replies-area" id="tw-replies-${tweetData.tweetId}"></div>
+        <div class="tw-add-reply-box">
+            <input type="text" class="tw-reply-input" id="tw-input-${tweetData.tweetId}" placeholder="Post your reply...">
+            <button class="tw-reply-btn" onclick="sendTwitterReply('${tweetData.tweetId}', '${tweetData.senderName}')">Reply</button>
+        </div>
+    `;
+
+    // แทรกทวีตไว้ล่างปุ่ม + (ให้อยู่บนสุดของฟีด)
+    const fabBtn = contentTW.querySelector('.tw-fab-create');
+    contentTW.insertBefore(twDiv, fabBtn);
+
+    if (tweetData.replies) {
+        tweetData.replies.forEach(r => addTwitterReplyToUI_NoSave(tweetData.tweetId, r.name, r.text));
+    }
+};
+
+// --- ระบบ Reply ---
+window.sendTwitterReply = function(tweetId, postOwner) {
+    const input = document.getElementById(`tw-input-${tweetId}`);
+    const text = input.value.trim();
+    if (!text) return;
+
+    const myName = getContext().name1 || "Me";
+    saveTwitterReply(tweetId, { name: myName, text: text });
+    addTwitterReplyToUI_NoSave(tweetId, myName, text);
+
+    sendHiddenPrompt(`[Twitter Reply จาก ${myName} ไปที่ทวีตของ ${postOwner}: "${text}"]`);
+    input.value = "";
+};
+
+window.addTwitterReplyToUI_NoSave = function(tweetId, name, text) {
+    const repliesArea = document.getElementById(`tw-replies-${tweetId}`);
+    if (!repliesArea) return;
+    const username = "@" + name.replace(/\s+/g, '').toLowerCase();
+
+    const replyDiv = document.createElement('div');
+    replyDiv.className = 'tw-reply-line';
+    replyDiv.innerHTML = `<span style="font-weight:bold; color:white;">${name}</span> <span style="color:#71767b;">${username}</span><br>${text}`;
+    repliesArea.appendChild(replyDiv);
+};
+
+// --- 2.4 แทรกคำสั่งโหลด History ตอนเริ่ม ---
+// ค้นหา eventSource.on(event_types.CHAT_CHANGED) แล้วเพิ่ม loadTwitterHistoryForCurrentChar()
+const originalChatChanged = eventSource.listeners(event_types.CHAT_CHANGED);
+eventSource.on(event_types.CHAT_CHANGED, () => {
+    loadTwitterHistoryForCurrentChar();
+});
+setTimeout(() => loadTwitterHistoryForCurrentChar(), 1000);
 
 // เรียกใช้ฟังก์ชันนี้ตอนโหลด Extension เพื่อตั้งค่าสีและวอลเปเปอร์เริ่มต้น
 jQuery(async () => {

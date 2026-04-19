@@ -751,3 +751,136 @@
 .ig-comment-btn {
     color: #0095f6; font-weight: bold; font-size: 13px; cursor: pointer; border: none; background: none;
 }
+
+/* =========================================
+   TWITTER APP UI
+========================================= */
+#window-twitter {
+    background-color: #000000; /* สีพื้นหลัง Twitter Dark Mode */
+    color: #ffffff;
+}
+
+#window-twitter .st-app-header {
+    background-color: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid #2f3336;
+    font-weight: bold;
+    font-size: 18px;
+}
+
+#content-twitter {
+    padding: 0;
+    background-color: #000000;
+}
+
+/* โครงสร้างทวีต */
+.tw-post {
+    border-bottom: 1px solid #2f3336;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+}
+
+.tw-post-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.tw-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    margin-right: 10px;
+}
+
+.tw-name-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.tw-display-name { font-weight: bold; font-size: 15px; }
+.tw-username { color: #71767b; font-size: 14px; }
+
+.tw-text {
+    font-size: 15px;
+    line-height: 1.5;
+    margin-left: 50px; /* ดันข้อความให้ตรงกับชื่อ */
+    margin-bottom: 10px;
+    white-space: pre-wrap; /* รองรับการขึ้นบรรทัดใหม่ */
+}
+
+.tw-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-left: 50px;
+    color: #71767b;
+    font-size: 14px;
+    max-width: 300px;
+}
+
+.tw-action-icon { cursor: pointer; display: flex; align-items: center; gap: 5px; }
+.tw-action-icon:hover { color: #1d9bf0; }
+.tw-action-icon.liked { color: #f91880; }
+
+/* ช่อง Reply ใต้ทวีต */
+.tw-replies-area {
+    margin-left: 50px;
+    margin-top: 10px;
+    border-left: 2px solid #2f3336;
+    padding-left: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.tw-reply-line {
+    font-size: 14px;
+    color: #e7e9ea;
+}
+
+.tw-add-reply-box {
+    margin-left: 50px;
+    display: flex;
+    align-items: center;
+    margin-top: 10px;
+    gap: 10px;
+}
+
+.tw-reply-input {
+    flex: 1; background-color: #202327; border: none; color: white;
+    border-radius: 20px; padding: 8px 15px; outline: none; font-size: 14px;
+}
+
+.tw-reply-btn {
+    background-color: #1d9bf0; color: white; border: none;
+    border-radius: 20px; padding: 6px 15px; font-weight: bold; cursor: pointer;
+}
+
+/* ปุ่ม Floating สำหรับสร้างทวีตใหม่ (ข้างในแอป) */
+.tw-fab-create {
+    position: absolute;
+    bottom: 20px; right: 20px;
+    width: 55px; height: 55px;
+    background-color: #1d9bf0;
+    border-radius: 50%;
+    display: flex; justify-content: center; align-items: center;
+    font-size: 24px; color: white;
+    box-shadow: 0 4px 10px rgba(29, 155, 240, 0.4);
+    cursor: pointer; z-index: 10;
+}
+
+/* หน้าต่างสร้างทวีตใหม่ */
+#tw-create-modal {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background-color: #000; z-index: 20; display: none; flex-direction: column;
+}
+.tw-create-header {
+    display: flex; justify-content: space-between; padding: 15px; border-bottom: 1px solid #2f3336;
+}
+.tw-textarea {
+    width: 100%; height: 150px; background-color: #000; color: white; border: none;
+    padding: 15px; font-size: 18px; outline: none; resize: none;
+}
