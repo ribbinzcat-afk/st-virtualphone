@@ -1,0 +1,74 @@
+/* ปุ่ม Floating ลอยอยู่มุมขวาล่าง */
+#vp-floating-btn {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 60px;
+    height: 60px;
+    background-color: #333;
+    border-radius: 50%;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    cursor: pointer;
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 30px;
+    transition: transform 0.2s;
+}
+
+#vp-floating-btn:hover {
+    transform: scale(1.1);
+}
+
+/* จุดแจ้งเตือนสีแดง (Badge) */
+.vp-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 15px;
+    height: 15px;
+    background-color: red;
+    border-radius: 50%;
+    display: none; /* ซ่อนไว้ก่อน จะโชว์ตอนมีแจ้งเตือน */
+}
+
+/* อนิเมชันสั่นเวลามีแจ้งเตือน */
+@keyframes vp-vibrate {
+    0% { transform: translate(0); }
+    20% { transform: translate(-2px, 2px); }
+    40% { transform: translate(-2px, -2px); }
+    60% { transform: translate(2px, 2px); }
+    80% { transform: translate(2px, -2px); }
+    100% { transform: translate(0); }
+}
+.vp-vibrating {
+    animation: vp-vibrate 0.3s ease-in-out infinite;
+}
+
+/* กรอบโทรศัพท์มือถือ */
+#vp-phone-container {
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: 320px;
+    height: 600px;
+    background-color: #000; /* สีกรอบโทรศัพท์ เปลี่ยนได้ทีหลัง */
+    border-radius: 40px;
+    border: 8px solid #222;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    z-index: 9998;
+    display: none; /* ซ่อนไว้ก่อน รอผู้ใช้กดปุ่ม */
+    overflow: hidden;
+    flex-direction: column;
+}
+
+/* หน้าจอโทรศัพท์ (Wallpaper จะมาใส่ตรงนี้) */
+#vp-phone-screen {
+    width: 100%;
+    height: 100%;
+    background-color: #f0f0f0;
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
