@@ -343,13 +343,6 @@ function triggerNotification(appId) {
     }
 }
 
-// --- ระบบ Regex Hook ดักจับข้อความจาก AI ---
-function setupMessageHook() {
-    // ดักจับเมื่อมีข้อความใหม่ถูกส่งเข้ามาหรือถูกแก้ไข
-    eventSource.on(event_types.MESSAGE_RECEIVED, handleNewMessage);
-    eventSource.on(event_types.MESSAGE_UPDATED, handleNewMessage);
-}
-
 function handleNewMessage(messageId) {
     // ดึง Context ของแชทปัจจุบัน
     const context = getContext();
