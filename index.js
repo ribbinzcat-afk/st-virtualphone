@@ -194,6 +194,13 @@ function createPhoneUI() {
         const homeScreen = document.createElement('div');
         homeScreen.id = 'st-phone-home';
 
+        // เพิ่มปุ่ม X สำหรับปิดโทรศัพท์ที่หน้า Home
+        const closeBtn = document.createElement('div');
+        closeBtn.className = 'st-close-phone-btn';
+        closeBtn.innerHTML = '✖';
+        closeBtn.onclick = togglePhone;
+        homeScreen.appendChild(closeBtn);
+
         // 3. สร้างไอคอนแอปลงใน Home Screen
         apps.forEach(app => {
             const appIcon = document.createElement('div');
@@ -422,12 +429,15 @@ function createPhoneUI() {
                     <div>Twitter</div>
                     <div style="width: 20px;"></div>
                 </div>
-                <div class="st-app-content" id="content-twitter" style="position: relative;">
-                    <div id="tw-empty-state" style="text-align: center; padding: 20px; color: #71767b;">No tweets yet.</div>
 
-                    <!-- ปุ่มสร้างทวีต -->
-                    <div class="tw-fab-create" onclick="openTwitterCreate()">➕</div>
+                <!-- พื้นที่สำหรับเลื่อนดูทวีต -->
+                <div class="st-app-content" id="content-twitter" style="padding: 0; background-color: #000;">
+                    <div id="tw-empty-state" style="text-align: center; padding: 20px; color: #71767b;">No tweets yet.</div>
+                    <!-- ทวีตจะมาโผล่ที่นี่ -->
                 </div>
+
+                <!-- ปุ่มสร้างทวีต (ย้ายออกมาอยู่นอกพื้นที่เลื่อน) -->
+                <div class="tw-fab-create" onclick="openTwitterCreate()">➕</div>
 
                 <!-- หน้าต่างสร้างทวีต -->
                 <div id="tw-create-modal">
@@ -1763,9 +1773,8 @@ window.renderTwitterUI_FromHistory = function(tweetData) {
         </div>
     `;
 
-    // แทรกทวีตไว้ล่างปุ่ม + (ให้อยู่บนสุดของฟีด)
-    const fabBtn = contentTW.querySelector('.tw-fab-create');
-    contentTW.insertBefore(twDiv, fabBtn);
+    // แทรกทวีตไว้บนสุดของฟีด
+    contentTW.insertBefore(twDiv, contentTW.firstChild);
 
     if (tweetData.replies) {
         tweetData.replies.forEach(r => addTwitterReplyToUI_NoSave(tweetData.tweetId, r.name, r.text));
