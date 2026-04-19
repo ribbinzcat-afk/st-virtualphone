@@ -1,3 +1,17 @@
+// --- โค้ดป้องกัน Error ระบบเสียงบนมือถือ ---
+if (typeof window.SpeechSynthesisUtterance === "undefined") {
+    window.SpeechSynthesisUtterance = function(text) { this.text = text; };
+    window.speechSynthesis = {
+        speak: function() {},
+        cancel: function() {},
+        pause: function() {},
+        resume: function() {},
+        getVoices: function() { return []; }
+    };
+    console.log("📱 SpeechSynthesis Polyfill Applied (ป้องกันโค้ดพัง)");
+}
+// ---------------------------------------
+
 import { getContext } from "../../../extensions.js";
 // นำเข้า eventSource จากระบบหลักของ SillyTavern เพื่อดักจับข้อความ
 import { eventSource, event_types } from "../../../../script.js";
