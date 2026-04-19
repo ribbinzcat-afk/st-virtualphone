@@ -311,16 +311,34 @@ function createPhoneUI() {
 
                 </div>
             `;
-        } else if (app.id === 'ig') {
-            // --- โครงสร้างแอป INSTAGRAM ---
+                } else if (app.id === 'ig') {
+            // --- โครงสร้างแอป INSTAGRAM (อัปเกรด) ---
             appWindow.innerHTML = `
+                <!-- หน้าฟีดหลัก -->
                 <div class="st-app-header">
                     <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
-                    <div style="font-weight: bold;">Instagram</div>
-                    <div class="line-header-icons">➕</div>
+                    <div style="font-weight: bold; font-family: 'Comic Sans MS', cursive;">Instagram</div>
+                    <div class="line-header-icons" style="cursor:pointer;" onclick="openIGCreatePost()">➕</div>
                 </div>
-                <div class="st-app-content" id="content-ig">
-                    <div style="text-align: center; padding: 20px; color: #888;">No posts yet.</div>
+                <div class="st-app-content" id="content-ig" style="padding: 0; background-color: #fff;">
+                    <div id="ig-empty-state" style="text-align: center; padding: 20px; color: #888;">No posts yet.</div>
+                </div>
+
+                <!-- หน้าต่างสร้างโพสต์ใหม่ -->
+                <div id="ig-create-post-modal">
+                    <div class="ig-create-header">
+                        <div class="ig-create-btn cancel" onclick="closeIGCreatePost()">Cancel</div>
+                        <div>New Post</div>
+                        <div class="ig-create-btn" onclick="submitIGPost()">Share</div>
+                    </div>
+                    <div class="ig-create-content">
+                        <input type="file" id="ig-upload-input" accept="image/*" style="display: none;" onchange="previewIGUpload(this)">
+                        <div class="ig-upload-preview" id="ig-upload-preview" onclick="document.getElementById('ig-upload-input').click()">
+                            <div style="color: #888;">Tap to select image</div>
+                        </div>
+                        <textarea id="ig-caption-input" class="ig-textarea" placeholder="Write a caption... (AI จะเห็นข้อความนี้)"></textarea>
+                        <textarea id="ig-hidden-desc-input" class="ig-textarea" placeholder="Image Description (อธิบายรูปให้ AI ฟัง แต่ไม่โชว์หน้าจอ)"></textarea>
+                    </div>
                 </div>
             `;
         } else {
@@ -582,17 +600,45 @@ function handleNewMessage(messageId) {
         return `<span style="display:none;" class="hidden-music-msg">${match}</span>`;
     });
 
-    // 5. ดักจับ Instagram - รูปแบบ: [IG|source|keyword|caption]
-    // ตัวอย่าง: [IG|web|cat|แมวน่ารักจัง] หรือ [IG|local|selfie1|ชุดใหม่]
-    const igRegex = /\[IG\|(web|local)\|(.*?)\|(.*?)\]/gi;
-    text = text.replace(igRegex, (match, source, keyword, caption) => {
+    // 5. ดักจับ Instagram (โพสต์ & คอมเมนต์)
+    // แบบที่ 1: AI สร้างโพสต์ -> [IG|post|web/local|keyword|caption]
+    const igPostRegex = /\[IG\|post\|(web|local)\|(.*?)\|(.*?)\]/gi;
+    text = text.replace(igPostRegex, (match, source, keyword, caption) => {
+        const sender = getContext().name2 || "Unknown";
 
-        // สั่งสร้างโพสต์ IG
-        createIGPost(source.trim().toLowerCase(), keyword.trim(), caption.trim());
-
+        if (source.trim().toLowerCase() === 'web') {
+            const cleanKeyword = keyword.replace(/\s+/g, ',');
+            const randomNum = Math.floor(Math.random() * 1000);
+            const imageUrl = `https://loremflickr.com/400/400/${cleanKeyword}?random=${randomNum}`;
+            renderIGPostUI(sender, imageUrl, caption.trim());
+        } else {
+            // ดึงจาก Local DB
+            if (imageDB) {
+                const tx = imageDB.transaction([STORE_NAME], "readonly");
+                const req = tx.objectStore(STORE_NAME).get(`ig_${keyword.trim().toLowerCase()}`);
+                req.onsuccess = (e) => {
+                    if (e.target.result && e.target.result.data) {
+                        renderIGPostUI(sender, e.target.result.data, caption.trim());
+                    } else {
+                        renderIGPostUI(sender, 'https://via.placeholder.com/400?text=Local+Image+Not+Found', caption.trim());
+                    }
+                };
+            }
+        }
         hasNotification = true;
-        triggerNotification('ig'); // แจ้งเตือนแอป IG
+        triggerNotification('ig');
+        return `<span style="display:none;" class="hidden-ig-msg">${match}</span>`;
+    });
 
+    // แบบที่ 2: AI คอมเมนต์ -> [IG|comment|ข้อความ]
+    const igCommentRegex = /\[IG\|comment\|(.*?)\]/gi;
+    text = text.replace(igCommentRegex, (match, commentText) => {
+        const sender = getContext().name2 || "Unknown";
+        if (latestPostId) {
+            addCommentToUI(latestPostId, sender, commentText.trim());
+            hasNotification = true;
+            triggerNotification('ig');
+        }
         return `<span style="display:none;" class="hidden-ig-msg">${match}</span>`;
     });
 
@@ -1295,48 +1341,126 @@ function fetchAndRenderSticker(keyword) {
     };
 }
 
-// --- ระบบแอป Instagram ---
+// --- ระบบแอป Instagram (อัปเกรด) ---
 
-window.createIGPost = function(source, keyword, caption) {
-    const contentIG = document.getElementById('content-ig');
-    if (!contentIG) return;
+let tempIGBase64 = "";
+let latestPostId = ""; // เก็บ ID โพสต์ล่าสุดเพื่อให้ AI คอมเมนต์ถูกที่
 
-    // ลบข้อความ "No posts yet" ออกถ้ามี
-    if (contentIG.innerHTML.includes("No posts yet.")) {
-        contentIG.innerHTML = '';
-    }
+// เปิด/ปิด หน้าต่างสร้างโพสต์
+window.openIGCreatePost = function() {
+    document.getElementById('ig-create-post-modal').style.display = 'flex';
+};
+window.closeIGCreatePost = function() {
+    document.getElementById('ig-create-post-modal').style.display = 'none';
+    document.getElementById('ig-upload-input').value = "";
+    document.getElementById('ig-upload-preview').style.backgroundImage = "none";
+    document.getElementById('ig-upload-preview').innerHTML = '<div style="color: #888;">Tap to select image</div>';
+    document.getElementById('ig-caption-input').value = "";
+    document.getElementById('ig-hidden-desc-input').value = "";
+    tempIGBase64 = "";
+};
+
+// พรีวิวรูปตอนเลือกไฟล์
+window.previewIGUpload = function(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        tempIGBase64 = e.target.result;
+        const preview = document.getElementById('ig-upload-preview');
+        preview.style.backgroundImage = `url('${tempIGBase64}')`;
+        preview.innerHTML = ""; // ลบข้อความ Tap to select
+    };
+    reader.readAsDataURL(file);
+};
+
+// ผู้ใช้กด Share โพสต์
+window.submitIGPost = function() {
+    const caption = document.getElementById('ig-caption-input').value.trim();
+    const hiddenDesc = document.getElementById('ig-hidden-desc-input').value.trim();
+
+    if (!tempIGBase64) return alert("กรุณาเลือกรูปภาพก่อนครับ");
 
     const context = getContext();
-    const sender = context.name2 || "Unknown";
-    const avatarUrl = getAvatarUrl(false, sender);
+    const myName = context.name1 || "Me";
+
+    // 1. สร้างโพสต์โชว์ในหน้าจอ
+    renderIGPostUI(myName, tempIGBase64, caption, true);
+
+    // 2. ส่ง Prompt เบื้องหลังบอก AI
+    const promptText = `[IG Post โดย ${myName}: (ภาพ: ${hiddenDesc}) แคปชั่น: "${caption}"] <span style="display:none;">(OOC: คุณสามารถคอมเมนต์โพสต์นี้ได้โดยพิมพ์ [IG|comment|ข้อความคอมเมนต์])</span>`;
+    sendHiddenPrompt(promptText);
+
+    closeIGCreatePost();
+};
+
+// ฟังก์ชันสร้าง UI โพสต์ (ใช้ร่วมกันทั้งเราและ AI)
+window.renderIGPostUI = function(senderName, imageUrl, caption, isBase64 = false) {
+    const contentIG = document.getElementById('content-ig');
+    const emptyState = document.getElementById('ig-empty-state');
+    if (emptyState) emptyState.style.display = 'none';
+
+    const postId = 'post_' + Date.now();
+    latestPostId = postId; // อัปเดตโพสต์ล่าสุด
+    const avatarUrl = getAvatarUrl(senderName === (getContext().name1 || "Me"), senderName);
     const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // สร้าง Element ของโพสต์
     const postDiv = document.createElement('div');
     postDiv.className = 'ig-post';
+    postDiv.id = postId;
 
-    // โครงสร้างเริ่มต้น (ยังไม่มีรูป)
     postDiv.innerHTML = `
         <div class="ig-post-header">
             <div class="ig-avatar" style="background-image: url('${avatarUrl}');"></div>
-            <div class="ig-username">${sender}</div>
+            <div class="ig-username">${senderName}</div>
         </div>
-        <div class="ig-image-container" id="ig-img-container-${Date.now()}">
-            <div style="color: #888; font-size: 12px;">Loading image...</div>
+        <div class="ig-image-container">
+            <img src="${imageUrl}" class="ig-image" onerror="this.src='https://via.placeholder.com/400?text=Image+Not+Found'">
         </div>
         <div class="ig-actions">
             <div class="ig-action-icon" onclick="this.classList.toggle('liked'); this.innerText = this.classList.contains('liked') ? '❤️' : '🤍'">🤍</div>
             <div class="ig-action-icon">💬</div>
-            <div class="ig-action-icon">✈️</div>
         </div>
         <div class="ig-caption-area">
-            <span class="ig-username">${sender}</span> ${caption}
+            <span class="ig-username">${senderName}</span> ${caption}
             <div class="ig-time">${timeString}</div>
         </div>
+        <div class="ig-comments-area" id="comments-${postId}"></div>
+        <div class="ig-add-comment-box">
+            <input type="text" class="ig-comment-input" id="input-${postId}" placeholder="Add a comment...">
+            <button class="ig-comment-btn" onclick="sendIGComment('${postId}', '${senderName}')">Post</button>
+        </div>
     `;
-
-    // แทรกโพสต์ใหม่ไว้บนสุด
     contentIG.insertBefore(postDiv, contentIG.firstChild);
+
+
+// ผู้ใช้พิมพ์คอมเมนต์
+window.sendIGComment = function(postId, postOwner) {
+    const input = document.getElementById(`input-${postId}`);
+    const text = input.value.trim();
+    if (!text) return;
+
+    const myName = getContext().name1 || "Me";
+
+    // 1. โชว์คอมเมนต์บนหน้าจอ
+    addCommentToUI(postId, myName, text);
+
+    // 2. ส่ง Prompt เบื้องหลัง
+    sendHiddenPrompt(`[IG Comment จาก ${myName} ไปที่โพสต์ของ ${postOwner}: "${text}"]`);
+
+    input.value = "";
+};
+
+// เพิ่มคอมเมนต์ลงใน UI
+window.addCommentToUI = function(postId, name, text) {
+    const commentsArea = document.getElementById(`comments-${postId}`);
+    if (!commentsArea) return;
+
+    const commentDiv = document.createElement('div');
+    commentDiv.className = 'ig-comment-line';
+    commentDiv.innerHTML = `<span class="ig-username">${name}</span> ${text}`;
+    commentsArea.appendChild(commentDiv);
+};
 
     // จัดการรูปภาพตาม Source (web หรือ local)
     const imgContainer = postDiv.querySelector('.ig-image-container');
