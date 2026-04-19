@@ -105,24 +105,39 @@ function createPhoneUI() {
     fab.id = 'st-phone-fab';
     fab.innerHTML = `📱<div id="st-phone-badge"></div>`;
     document.body.appendChild(fab);
-
-    // เรียกใช้ฟังก์ชันทำให้ปุ่มลากได้
     makeDraggable(fab);
-    
+
     // 2. สร้างกรอบโทรศัพท์
     const phoneContainer = document.createElement('div');
     phoneContainer.id = 'st-phone-container';
 
-    // สร้างหน้าจอหลัก (Screen)
+    // สร้าง Home Screen (มีนาฬิกา)
     const screen = document.createElement('div');
     screen.id = 'st-phone-screen';
 
-    // สร้าง Home Screen
     const homeScreen = document.createElement('div');
     homeScreen.id = 'st-phone-home';
+    homeScreen.innerHTML = `
+        <div class="home-clock-widget">
+            <div class="home-time" id="home-clock-time">00:00</div>
+            <div class="home-date" id="home-clock-date">Mon, Jan 1</div>
+        </div>
+        <div class="app-grid" id="home-app-grid"></div>
+    `;
 
-    // สร้างไอคอนแอปใส่ใน Home Screen
+    // อัปเดตนาฬิกาทุก 1 นาที
+    setInterval(() => {
+        const now = new Date();
+        document.getElementById('home-clock-time').innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('home-clock-date').innerText = now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    }, 1000);
+
+    screen.appendChild(homeScreen);
+
+    // สร้างไอคอนและหน้าต่างแอป
     apps.forEach(app => {
+        // สร้างไอคอน
+        const appGrid = homeScreen.querySelector('#home-app-grid');
         const appIcon = document.createElement('div');
         appIcon.className = 'st-app-icon';
         appIcon.innerHTML = `
@@ -131,89 +146,120 @@ function createPhoneUI() {
             <div class="st-app-icon-name">${app.name}</div>
         `;
         appIcon.addEventListener('click', () => openApp(app.id, app.name));
-        homeScreen.appendChild(appIcon);
-    });
+        appGrid.appendChild(appIcon);
 
-    screen.appendChild(homeScreen);
-
-    // สร้างหน้าต่างสำหรับแต่ละแอป (ซ่อนไว้ก่อน)
-    apps.forEach(app => {
+        // สร้างหน้าต่างแอป
         const appWindow = document.createElement('div');
         appWindow.id = `window-${app.id}`;
         appWindow.className = 'st-app-window';
 
         if (app.id === 'line') {
-            // --- โครงสร้างแอป LINE (อัปเดตมีหน้ารวมแชท) ---
+            // --- แอป LINE (ดีไซน์ใหม่) ---
             appWindow.innerHTML = `
-                <!-- หน้า 1: หน้ารวมแชท (Chat List) -->
                 <div id="line-chat-list-view" style="display: flex; flex-direction: column; height: 100%;">
                     <div class="st-app-header">
                         <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
-                        <div>Chats</div>
-                        <div class="line-header-icons">⚙️</div>
+                        <div>Messages</div>
+                        <div style="font-size: 20px;">📝</div>
                     </div>
-                    <div class="st-app-content" id="line-chat-list-content" style="padding: 0; background-color: #fff;">
-                        <!-- รายชื่อแชทจะถูกสร้างที่นี่ -->
-                    </div>
+                    <div class="st-app-content" id="line-chat-list-content" style="padding: 0; background-color: #121212;"></div>
                 </div>
 
-                <!-- หน้า 2: หน้าห้องแชทส่วนตัว (Chat Room) -->
                 <div id="line-chat-room-view" style="display: none; flex-direction: column; height: 100%;">
                     <div class="st-app-header">
                         <div class="st-back-btn" id="btn-back-to-chatlist">❮</div>
                         <div id="line-chat-title">Name</div>
-                        <div class="line-header-icons">📞 ≡</div>
+                        <div style="font-size: 20px;">📞</div>
                     </div>
-                    <div class="st-app-content" id="content-line">
-                        <!-- บับเบิลแชทจะมาโผล่ที่นี่ -->
-                    </div>
+                    <div class="st-app-content" id="content-line"></div>
                     <div class="line-input-area">
-                        <div class="line-icon-btn">＋</div>
-                        <div class="line-icon-btn">📷</div>
-                        <div class="line-icon-btn">😊</div>
-                        <input type="text" class="line-input-field" id="line-input" placeholder="Aa">
-                        <div class="line-icon-btn" id="line-mic-icon">🎤</div>
+                        <div style="font-size: 20px; color: #888;">＋</div>
+                        <input type="text" class="line-input-field" id="line-input" placeholder="Message...">
                         <div class="line-send-btn" id="line-send-btn">Send</div>
                     </div>
                 </div>
             `;
-        } else if (app.id === 'phone') {
-            // --- โครงสร้างแอป PHONE ---
+        }
+        else if (app.id === 'phone') {
+            // --- แอป PHONE (หน้าประวัติ -> หน้ารับสาย -> หน้าคุย) ---
             appWindow.innerHTML = `
-                <!-- หน้า 1: สายเรียกเข้า (Incoming Call) -->
-                <div id="phone-incoming-view">
-                    <div class="phone-large-avatar" id="incoming-avatar"></div>
-                    <div class="phone-caller-name" id="incoming-name">Unknown</div>
-                    <div class="phone-status-text">Incoming Call...</div>
-                    <div class="phone-action-buttons">
-                        <div class="phone-btn phone-btn-decline" onclick="declineCall()">📴</div>
-                        <div class="phone-btn phone-btn-accept" onclick="acceptCall()">📞</div>
+                <!-- หน้า 1: ประวัติการโทร (Call History) -->
+                <div id="phone-history-view" style="display: flex; flex-direction: column; height: 100%;">
+                    <div class="st-app-header">
+                        <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
+                        <div>Recent Calls</div>
+                        <div></div>
+                    </div>
+                    <div class="st-app-content" style="padding: 20px; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                        <div class="phone-large-avatar" id="history-avatar" style="width: 100px; height: 100px; margin-bottom: 15px;"></div>
+                        <div style="font-size: 24px; font-weight: bold; margin-bottom: 30px;" id="history-name">Character</div>
+                        <button class="phone-btn phone-btn-accept" onclick="makeOutgoingCall()">📞</button>
+                        <div style="margin-top: 15px; color: #888;">Call</div>
                     </div>
                 </div>
 
-                <!-- หน้า 2: กำลังคุยสาย (Active Call) -->
-                <div id="phone-active-view">
-                    <div class="active-call-header">
-                        <div class="active-call-avatar" id="active-avatar"></div>
-                        <div style="font-weight: bold; font-size: 18px;" id="active-name">Name</div>
-                        <div class="active-call-timer" id="active-timer">00:00</div>
+                <!-- หน้า 2: สายเรียกเข้า / กำลังโทรออก (เต็มจอ) -->
+                <div id="phone-incoming-view" style="display: none; height: 100%; position: relative;">
+                    <div class="phone-bg-overlay" id="incoming-bg"></div>
+                    <div class="phone-ui-layer">
+                        <div class="phone-caller-info">
+                            <div class="phone-large-avatar" id="incoming-avatar"></div>
+                            <div class="phone-caller-name" id="incoming-name">Unknown</div>
+                            <div class="phone-status-text" id="incoming-status">Incoming Call...</div>
+                        </div>
+                        <div class="phone-action-buttons">
+                            <div class="phone-btn phone-btn-decline" onclick="declineCall()">📴</div>
+                            <div class="phone-btn phone-btn-accept" id="btn-accept-call" onclick="acceptCall()">📞</div>
+                        </div>
                     </div>
-                    <div id="phone-transcript">
-                        <!-- คำพูดจะมาแสดงตรงนี้ -->
-                        <div style="text-align: center; color: #888; font-size: 12px; margin-top: 10px;">Call connected.</div>
-                    </div>
+                </div>
 
-                    <!-- ช่องพิมพ์ตอบกลับระหว่างคุยสาย -->
-                    <div style="display: flex; padding: 10px; background-color: #1c1c1e; border-top: 1px solid #333;">
-                        <input type="text" id="phone-input" placeholder="Speak..." style="flex: 1; border: none; border-radius: 15px; padding: 10px 15px; background-color: #2c2c2e; color: white; outline: none;">
-                        <div style="color: #007aff; padding: 10px; font-weight: bold; cursor: pointer;" onclick="sendPhoneMessage()">Send</div>
+                <!-- หน้า 3: กำลังคุยสาย (เต็มจอ + แชท) -->
+                <div id="phone-active-view" style="display: none; height: 100%; position: relative;">
+                    <div class="phone-bg-overlay" id="active-bg"></div>
+                    <div class="phone-ui-layer">
+                        <div style="padding: 20px; display: flex; align-items: center; gap: 15px; background: rgba(0,0,0,0.5); backdrop-filter: blur(10px);">
+                            <div class="line-avatar" id="active-small-avatar" style="width: 45px; height: 45px;"></div>
+                            <div>
+                                <div style="font-weight: bold; font-size: 18px;" id="active-name">Name</div>
+                                <div style="color: #4ade80; font-size: 14px;" id="active-timer">00:00</div>
+                            </div>
+                            <div class="phone-btn phone-btn-decline" style="width: 45px; height: 45px; font-size: 20px; margin-left: auto;" onclick="endCall()">📴</div>
+                        </div>
+                        <div id="phone-transcript"></div>
+                        <div style="padding: 15px; background: rgba(0,0,0,0.7); backdrop-filter: blur(10px); display: flex; gap: 10px;">
+                            <input type="text" id="phone-input" placeholder="Speak..." style="flex: 1; border: none; border-radius: 20px; padding: 10px 15px; background: rgba(255,255,255,0.1); color: white; outline: none;">
+                            <div style="color: #a78bfa; padding: 10px; font-weight: bold; cursor: pointer;" onclick="sendPhoneMessage()">Send</div>
+                        </div>
                     </div>
+                </div>
+            `;
+        }
+        else if (app.id === 'ig') {
+            // --- แอป IG (มีปุ่มอัปโหลด + ช่องคอมเมนต์) ---
+            appWindow.innerHTML = `
+                <div class="st-app-header">
+                    <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
+                    <div style="font-family: 'Comic Sans MS', cursive; font-size: 20px; font-weight: bold;">Instagram</div>
+                    <div style="font-size: 24px; cursor: pointer;" onclick="document.getElementById('ig-upload-modal').style.display='flex'">➕</div>
+                </div>
+                <div class="st-app-content" id="content-ig" style="background-color: #000;">
+                    <div style="text-align: center; padding: 40px; color: #666;">No posts yet.</div>
+                </div>
 
-                    <div class="active-call-controls">
-                        <div class="call-control-btn">🔇</div>
-                        <div class="call-control-btn">📹</div>
-                        <div class="call-control-btn end-call" onclick="endCall()">📴</div>
+                <!-- Modal อัปโหลด IG -->
+                <div id="ig-upload-modal">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                        <span style="font-size: 18px; cursor: pointer; color: white;" onclick="document.getElementById('ig-upload-modal').style.display='none'">✕ Cancel</span>
+                        <span style="font-size: 18px; cursor: pointer; color: #38bdf8; font-weight: bold;" onclick="postMyIG()">Share</span>
                     </div>
+                    <input type="file" id="ig-my-file" accept="image/*" style="display: none;" onchange="previewMyIGImage(this)">
+                    <div style="width: 100%; height: 250px; background: #222; border-radius: 15px; margin-bottom: 15px; display: flex; justify-content: center; align-items: center; cursor: pointer; overflow: hidden;" onclick="document.getElementById('ig-my-file').click()">
+                        <img id="ig-my-preview" style="display: none; width: 100%; height: 100%; object-fit: cover;">
+                        <span id="ig-my-placeholder" style="color: #888;">Tap to select image</span>
+                    </div>
+                    <textarea id="ig-my-caption" class="ig-modal-input" rows="3" placeholder="Write a caption..."></textarea>
+                    <textarea id="ig-my-hidden-context" class="ig-modal-input" rows="2" placeholder="Hidden Context for AI (e.g. ภาพเซลฟี่ในห้องนอน)"></textarea>
                 </div>
             `;
         } else if (app.id === 'music') {
@@ -301,18 +347,6 @@ function createPhoneUI() {
 
                 </div>
             `;
-        } else if (app.id === 'ig') {
-            // --- โครงสร้างแอป INSTAGRAM ---
-            appWindow.innerHTML = `
-                <div class="st-app-header">
-                    <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
-                    <div style="font-weight: bold;">Instagram</div>
-                    <div class="line-header-icons">➕</div>
-                </div>
-                <div class="st-app-content" id="content-ig">
-                    <div style="text-align: center; padding: 20px; color: #888;">No posts yet.</div>
-                </div>
-            `;
         } else {
             // --- โครงสร้างแอปอื่นๆ (ยังเหมือนเดิม) ---
             appWindow.innerHTML = `
@@ -330,6 +364,11 @@ function createPhoneUI() {
 
     phoneContainer.appendChild(screen);
     document.body.appendChild(phoneContainer);
+
+    // เรียกใช้ฟังก์ชันอัปเดตนาฬิกาทันที
+    document.getElementById('home-clock-time').innerText = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    fab.addEventListener('click', (e) => { if (!isDragging) togglePhone(); });
 
     // อัปเดต Event Click: เปิดโทรศัพท์ก็ต่อเมื่อ "ไม่ได้กำลังลาก"
     fab.addEventListener('click', (e) => {
@@ -512,6 +551,15 @@ function handleNewMessage(messageId) {
 
         return `<span style="display:none;" class="hidden-line-msg">${match}</span>`;
     });
+
+    // ซ่อนข้อความฝั่งผู้ใช้ที่พิมพ์ผ่านแอป (ไม่ให้โชว์ในแชทหลัก)
+    const userHiddenRegex = /\[(Line|Phone|IG|System)(.*?)\]/gi;
+    if (msgElement.classList.contains('mes_text') && msgElement.closest('.mes').getAttribute('is_user') === 'true') {
+        text = text.replace(userHiddenRegex, (match) => {
+            return `<span style="display:none;">${match}</span>`;
+        });
+        msgElement.innerHTML = text;
+    }
 
         // 1.5 ดักจับสติกเกอร์ใน Line - รูปแบบ: [Sticker: คีย์เวิร์ด] หรือ [Sticker|คีย์เวิร์ด]
     const stickerRegex = /\[Sticker[:|]\s*(.*?)\]/gi;
@@ -1301,6 +1349,10 @@ window.createIGPost = function(source, keyword, caption) {
             <span class="ig-username">${sender}</span> ${caption}
             <div class="ig-time">${timeString}</div>
         </div>
+        <div class="ig-comment-input-area">
+            <input type="text" class="ig-comment-input" placeholder="Add a comment...">
+            <div class="ig-comment-btn" onclick="sendIGComment(this, '${sender}')">Post</div>
+        </div>
     `;
 
     // แทรกโพสต์ใหม่ไว้บนสุด
@@ -1339,12 +1391,145 @@ window.createIGPost = function(source, keyword, caption) {
     }
 };
 
+// อัปเดตหน้าประวัติการโทร
+function updatePhoneHistoryUI() {
+    const context = getContext();
+    const charName = context.name2 || "Character";
+    const avatarUrl = getAvatarUrl(false, charName);
+
+    const nameEl = document.getElementById('history-name');
+    const avatarEl = document.getElementById('history-avatar');
+
+    if (nameEl) nameEl.innerText = charName;
+    if (avatarEl) avatarEl.style.backgroundImage = `url('${avatarUrl}')`;
+}
+
+// ผู้ใช้กดโทรออกหาบอท
+window.makeOutgoingCall = function() {
+    const context = getContext();
+    currentCallerName = context.name2 || "Character";
+    const avatarUrl = getAvatarUrl(false, currentCallerName);
+
+    // ตั้งค่า UI แบบเต็มจอ
+    document.getElementById('incoming-name').innerText = currentCallerName;
+    document.getElementById('incoming-status').innerText = "Calling...";
+    document.getElementById('incoming-avatar').style.backgroundImage = `url('${avatarUrl}')`;
+    document.getElementById('incoming-bg').style.backgroundImage = `url('${avatarUrl}')`;
+
+    // ซ่อนปุ่มรับสาย (เพราะเราเป็นคนโทร)
+    document.getElementById('btn-accept-call').style.display = 'none';
+
+    document.getElementById('phone-history-view').style.display = 'none';
+    document.getElementById('phone-incoming-view').style.display = 'flex';
+
+    // ส่ง Prompt หา AI
+    sendHiddenPrompt(`[System: ผู้ใช้กำลังโทรศัพท์หาคุณ กรุณารับสายโดยพิมพ์ [Call: รับสาย] หรือตัดสายโดยพิมพ์ [Call: ตัดสาย]]`);
+};
+
+// ปรับปรุงฟังก์ชันรับสาย (UI เต็มจอ)
+window.acceptCall = function() {
+    isCallActive = true;
+    const avatarUrl = getAvatarUrl(false, currentCallerName);
+
+    document.getElementById('active-name').innerText = currentCallerName;
+    document.getElementById('active-small-avatar').style.backgroundImage = `url('${avatarUrl}')`;
+    document.getElementById('active-bg').style.backgroundImage = `url('${avatarUrl}')`; // พื้นหลังเต็มจอ
+    document.getElementById('phone-transcript').innerHTML = '';
+
+    document.getElementById('phone-incoming-view').style.display = 'none';
+    document.getElementById('phone-active-view').style.display = 'flex';
+
+    callSeconds = 0;
+    callTimerInterval = setInterval(() => {
+        callSeconds++;
+        const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const secs = String(callSeconds % 60).padStart(2, '0');
+        document.getElementById('active-timer').innerText = `${mins}:${secs}`;
+    }, 1000);
+
+    sendHiddenPrompt(`[System: ผู้ใช้กดรับสายโทรศัพท์จาก ${currentCallerName} แล้ว กรุณาเริ่มพูดคุยผ่านโทรศัพท์]`);
+};
+
+let tempMyIGBase64 = "";
+
+window.previewMyIGImage = function(input) {
+    const file = input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        tempMyIGBase64 = e.target.result;
+        document.getElementById('ig-my-preview').src = tempMyIGBase64;
+        document.getElementById('ig-my-preview').style.display = 'block';
+        document.getElementById('ig-my-placeholder').style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+};
+
+window.postMyIG = function() {
+    const caption = document.getElementById('ig-my-caption').value;
+    const hiddenContext = document.getElementById('ig-my-hidden-context').value;
+
+    if (!tempMyIGBase64) return alert("Please select an image.");
+
+    // โชว์ในฟีดของตัวเอง
+    const context = getContext();
+    const myName = context.name1 || "Me";
+
+    // สร้างโพสต์แบบพิเศษสำหรับผู้ใช้
+    const contentIG = document.getElementById('content-ig');
+    if (contentIG.innerHTML.includes("No posts yet.")) contentIG.innerHTML = '';
+
+    const postDiv = document.createElement('div');
+    postDiv.className = 'ig-post';
+    postDiv.innerHTML = `
+        <div class="ig-post-header">
+            <div class="ig-avatar" style="background-image: url('${getAvatarUrl(true, myName)}');"></div>
+            <div class="ig-username">${myName}</div>
+        </div>
+        <div class="ig-image-container"><img src="${tempMyIGBase64}" class="ig-image"></div>
+        <div class="ig-caption-area" style="margin-top: 10px;">
+            <span class="ig-username">${myName}</span> ${caption}
+        </div>
+    `;
+    contentIG.insertBefore(postDiv, contentIG.firstChild);
+
+    // ส่ง Prompt หา AI
+    const prompt = `[IG ของ ${myName}: แคปชั่น "${caption}" | ข้อมูลภาพสำหรับ AI: ${hiddenContext}]`;
+    sendHiddenPrompt(prompt);
+
+    // ปิด Modal และเคลียร์ค่า
+    document.getElementById('ig-upload-modal').style.display = 'none';
+    tempMyIGBase64 = "";
+    document.getElementById('ig-my-preview').style.display = 'none';
+    document.getElementById('ig-my-placeholder').style.display = 'block';
+    document.getElementById('ig-my-caption').value = "";
+    document.getElementById('ig-my-hidden-context').value = "";
+};
+
+// ฟังก์ชันส่งคอมเมนต์ IG
+window.sendIGComment = function(btnElement, postOwner) {
+    const input = btnElement.previousElementSibling;
+    const text = input.value.trim();
+    if (text) {
+        // ส่ง Prompt คอมเมนต์
+        sendHiddenPrompt(`[IG Comment ถึง ${postOwner}: ${text}]`);
+        input.value = "";
+        alert("Comment sent!");
+    }
+};
+
 // เรียกใช้ฟังก์ชันนี้ตอนโหลด Extension เพื่อตั้งค่าสีและวอลเปเปอร์เริ่มต้น
 jQuery(async () => {
     console.log("📱 ST Virtual Phone Loaded!");
     createPhoneUI();
     setupSettingsMenu();
     setupMessageHook();
-    loadPhoneSettings(); // <--- เพิ่มบรรทัดนี้
-    initImageDB(); // เดี๋ยวเราจะเขียนฟังก์ชันนี้ในขั้นตอนถัดไป
+    loadPhoneSettings();
+    initImageDB();
+
+    // โหลดประวัติแชท Line และหน้า Phone History มารอไว้เลย
+    setTimeout(() => {
+        updateLineChatList();
+        updatePhoneHistoryUI();
+    }, 1000);
 });
