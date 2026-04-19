@@ -237,17 +237,17 @@ function createPhoneUI() {
                     </div>
                 </div>
             `;
-                        } else if (app.id === 'settings') {
-            // --- โครงสร้างแอป SETTINGS (อัปเดตเต็มรูปแบบ) ---
+            } else if (app.id === 'settings') {
+            // --- โครงสร้างแอป SETTINGS (แก้ไขปุ่มอัปโหลด) ---
             appWindow.innerHTML = `
                 <div class="st-app-header" style="background-color: #f2f2f7;">
                     <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
                     <div>Settings</div>
-                    <div style="width: 20px;"></div> <!-- spacer -->
+                    <div style="width: 20px;"></div>
                 </div>
                 <div class="st-app-content settings-container">
 
-                    <!-- ส่วนที่ 1: ปรับแต่งโทรศัพท์ (สี & Wallpaper) -->
+                    <!-- ส่วนที่ 1: ปรับแต่งโทรศัพท์ -->
                     <div class="settings-section">
                         <h4>🎨 Personalization</h4>
                         <div class="settings-row">
@@ -256,13 +256,15 @@ function createPhoneUI() {
                         </div>
                         <div class="settings-row">
                             <span>Wallpaper URL</span>
-                            <input type="text" id="setting-wallpaper-url" placeholder="Image URL or Base64" class="settings-input">
+                            <input type="text" id="setting-wallpaper-url" placeholder="Paste link here" class="settings-input">
                         </div>
-                        <!-- ปุ่มอัปโหลดไฟล์สำหรับ Wallpaper -->
-                        <div class="settings-row">
-                            <input type="file" id="setting-wallpaper-file" accept="image/*" style="width: 70%; font-size: 12px;">
-                            <button class="settings-btn" onclick="uploadWallpaperFile()">Upload</button>
+
+                        <!-- แก้ไข: ปุ่มอัปโหลด Wallpaper -->
+                        <div class="settings-row" style="justify-content: flex-end;">
+                            <input type="file" id="setting-wallpaper-file" accept="image/*" style="display: none;" onchange="handleWallpaperUpload(this)">
+                            <button class="settings-btn" style="background-color: #6c757d;" onclick="document.getElementById('setting-wallpaper-file').click()">📂 Upload from PC</button>
                         </div>
+
                         <button class="settings-btn" style="width: 100%; margin-top: 10px;" onclick="applyPhoneSettings()">Apply Changes</button>
                     </div>
 
@@ -270,17 +272,17 @@ function createPhoneUI() {
                     <div class="settings-section">
                         <h4>🖼️ Image Library (Sticker/IG)</h4>
 
-                        <!-- 1. เลือกไฟล์ -->
-                        <div class="settings-row">
-                            <input type="file" id="image-file-input" accept="image/*" style="width: 100%; font-size: 12px;" onchange="previewImageFile()">
+                        <!-- แก้ไข: ปุ่มเลือกไฟล์ Sticker/IG -->
+                        <div class="settings-row" style="justify-content: center;">
+                            <input type="file" id="image-file-input" accept="image/*" style="display: none;" onchange="previewImageFile(this)">
+                            <button class="settings-btn" style="background-color: #6c757d; width: 100%;" onclick="document.getElementById('image-file-input').click()">📂 Choose Image File</button>
                         </div>
 
-                        <!-- 2. พื้นที่แสดงรูปพรีวิว (จะโชว์เมื่อเลือกไฟล์) -->
+                        <!-- พื้นที่พรีวิว -->
                         <div id="image-preview-container" style="display: none; text-align: center; margin-bottom: 15px;">
-                            <img id="image-preview-img" src="" style="max-width: 100px; max-height: 100px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                            <img id="image-preview-img" src="" style="max-width: 100px; max-height: 100px; border-radius: 8px; border: 1px solid #ddd;">
                         </div>
 
-                        <!-- 3. เลือกประเภทและตั้งชื่อ -->
                         <div class="settings-row">
                             <select id="image-upload-type" class="settings-input" style="width: 40%;">
                                 <option value="sticker">Sticker</option>
@@ -289,10 +291,8 @@ function createPhoneUI() {
                             <input type="text" id="image-keyword" placeholder="Keyword (e.g. cat_cry)" class="settings-input" style="width: 55%;">
                         </div>
 
-                        <!-- 4. ปุ่มกดเซฟ -->
                         <button class="settings-btn" style="width: 100%; background-color: #28a745; margin-bottom: 10px;" onclick="uploadImageToDB()">Save to Database</button>
 
-                        <!-- ลิสต์แสดงรูปภาพที่บันทึกไว้ -->
                         <div id="sticker-list-container">
                             <div style="text-align: center; color: #888; font-size: 12px;">Loading saved images...</div>
                         </div>
@@ -1067,47 +1067,31 @@ window.applyPhoneSettings = function() {
 };
 
 // ฟังก์ชันอัปโหลดและแปลงไฟล์ Wallpaper เป็น Base64
-window.uploadWallpaperFile = function() {
-    const fileInput = document.getElementById('setting-wallpaper-file');
-    const file = fileInput.files[0];
+window.handleWallpaperUpload = function(inputElement) {
+    const file = inputElement.files[0];
+    if (!file) return;
 
-    if (!file) {
-        alert("กรุณาเลือกไฟล์รูปภาพก่อนครับ");
-        return;
-    }
-
-    // ตรวจสอบขนาดไฟล์ (ไม่ควรเกิน 2MB เพื่อป้องกัน LocalStorage เต็ม)
     if (file.size > 2 * 1024 * 1024) {
         alert("ไฟล์ใหญ่เกินไปครับ กรุณาใช้รูปภาพขนาดไม่เกิน 2MB");
+        inputElement.value = "";
         return;
     }
 
     const reader = new FileReader();
     reader.onload = function(e) {
-        const base64String = e.target.result;
-
-        // นำ Base64 ไปใส่ในช่อง URL
-        const wpInput = document.getElementById('setting-wallpaper-url');
-        if (wpInput) wpInput.value = base64String;
-
-        // บังคับกด Apply ให้อัตโนมัติ
+        // ใส่ Base64 ลงในช่อง URL และเปลี่ยน Wallpaper ทันที
+        document.getElementById('setting-wallpaper-url').value = e.target.result;
         applyPhoneSettings();
-
-        // ล้างค่าช่องเลือกไฟล์
-        fileInput.value = "";
+        inputElement.value = ""; // ล้างค่าเผื่อเลือกไฟล์เดิมซ้ำ
     };
     reader.readAsDataURL(file);
 };
 
-// --- ฟังก์ชันจัดการรูปภาพ (Settings UI) ---
-
-// ตัวแปรเก็บรูปภาพชั่วคราวก่อนกดเซฟ
+// --- แก้ไข: ฟังก์ชันพรีวิว Sticker/IG ---
 let tempImageBase64 = "";
 
-// ฟังก์ชัน 1: พรีวิวรูปภาพเมื่อผู้ใช้กดเลือกไฟล์
-window.previewImageFile = function() {
-    const fileInput = document.getElementById('image-file-input');
-    const file = fileInput.files[0];
+window.previewImageFile = function(inputElement) {
+    const file = inputElement.files[0];
     const previewContainer = document.getElementById('image-preview-container');
     const previewImg = document.getElementById('image-preview-img');
 
@@ -1117,17 +1101,16 @@ window.previewImageFile = function() {
         return;
     }
 
-    // ตรวจสอบขนาดไฟล์ (จำกัด 2MB)
     if (file.size > 2 * 1024 * 1024) {
         alert("ไฟล์ใหญ่เกินไปครับ กรุณาใช้รูปภาพขนาดไม่เกิน 2MB");
-        fileInput.value = "";
+        inputElement.value = "";
         return;
     }
 
     const reader = new FileReader();
     reader.onload = function(e) {
-        tempImageBase64 = e.target.result; // เก็บ Base64 ไว้ในตัวแปร
-        previewImg.src = tempImageBase64;  // แสดงรูปบนหน้าจอ
+        tempImageBase64 = e.target.result;
+        previewImg.src = tempImageBase64;
         previewContainer.style.display = 'block';
     };
     reader.readAsDataURL(file);
