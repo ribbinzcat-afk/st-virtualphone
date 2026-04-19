@@ -79,5 +79,8 @@ async function init() {
 
 // รอให้ SillyTavern พร้อม แล้วค่อยรันฟังก์ชัน init
 jQuery(async () => {
-    await init();
+    // แก้จากรัน init() ทันที เป็นรอให้ Event APP_READY ทำงานก่อน
+    eventSource.on(event_types.APP_READY, async () => {
+        await init();
+    });
 });
