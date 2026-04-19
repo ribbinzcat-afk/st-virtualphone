@@ -79,19 +79,18 @@
 }
 
 /* --- Phone Container (อัปเกรดให้อยู่บนสุดและตรงกลาง 100%) --- */
-/* --- Phone Container (ลอยตรงกลางหน้าจอเป๊ะๆ) --- */
+/* --- Phone Container (ใช้สูตร calc ของคุณ Lou) --- */
 #st-phone-container {
     position: fixed;
+    /* เว้นขอบบนไว้ 10% ของหน้าจอ เพื่อไม่ให้ทะลุขอบบน */
+    top: 10vh !important;
 
-    /* สูตรจัดกึ่งกลางหน้าจอ 100% (ทั้งแนวตั้งและแนวนอน) */
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    margin: 0 !important;
+    /* จัดกึ่งกลาง: กว้าง 350px ครึ่งนึงคือ 175px */
+    left: calc(50vw - 175px) !important;
 
     width: 350px;
     height: 700px;
-    max-height: 85vh; /* ไม่ให้สูงเกิน 85% ของหน้าจอ (ป้องกันทะลุขอบบน/ล่าง) */
+    max-height: 85vh; /* ป้องกันทะลุขอบล่าง */
 
     background-color: #1e1e1e;
     border: 10px solid #333;
@@ -102,6 +101,9 @@
     display: none;
     flex-direction: column;
     overflow: hidden;
+
+    /* ลบ transform ออกทั้งหมดตามที่คุณ Lou แนะนำ */
+    margin: 0;
 }
 
 /* หน้าจอภายในโทรศัพท์ */
@@ -115,13 +117,18 @@
 /* --- Responsive สำหรับมือถือ (max-width: 768px) --- */
 @media (max-width: 768px) {
     #st-phone-container {
-        width: 90vw !important; /* กว้าง 90% ของจอมือถือ */
+        width: 90vw !important;
+
+        /* จัดกึ่งกลางบนมือถือ: กว้าง 90vw ครึ่งนึงคือ 45vw */
+        left: calc(50vw - 45vw) !important;
+
+        /* บนมือถืออาจจะดันขึ้นไปอีกนิดนึงเป็น 5vh เผื่อจอมือถือสั้น */
+        top: 5vh !important;
+
+        height: 90vh !important;
         max-width: 400px !important;
-        height: 85vh !important; /* สูง 85% ของจอมือถือ */
         border-width: 5px !important;
         border-radius: 20px !important;
-
-        /* ไม่ต้องแก้ top/left/transform เพราะสูตรด้านบนครอบคลุมมือถือแล้ว */
     }
 }
 
