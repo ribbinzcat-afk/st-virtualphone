@@ -656,25 +656,31 @@ function openApp(appId, appName) {
     document.getElementById(`window-${appId}`).style.display = 'flex';
 }
 
-function togglePhone() {
+// ฟังก์ชันเปิด/ปิด โทรศัพท์
+window.togglePhone = function() {
     const phone = document.getElementById('st-phone-container');
     const badge = document.getElementById('st-phone-badge');
     const fab = document.getElementById('st-phone-fab');
+
+    if (!phone) return; // ป้องกัน Error ถ้าหาหน้าจอไม่เจอ
 
     isPhoneOpen = !isPhoneOpen;
 
     if (isPhoneOpen) {
         phone.style.display = 'flex';
-        badge.style.display = 'none';
-        fab.classList.remove('fab-vibrating');
+        if (badge) badge.style.display = 'none';
+        if (fab) fab.classList.remove('fab-vibrating');
     } else {
         phone.style.display = 'none';
         // ปิดทุกแอปเมื่อปิดโทรศัพท์ ให้กลับไปหน้า Home
-        apps.forEach(app => {
-            document.getElementById(`window-${app.id}`).style.display = 'none';
-        });
+        if (typeof apps !== 'undefined') {
+            apps.forEach(app => {
+                const appWin = document.getElementById(`window-${app.id}`);
+                if (appWin) appWin.style.display = 'none';
+            });
+        }
     }
-}
+};
 
 // 3. ฟังก์ชันเปิด/ปิด ปุ่ม Floating (สำหรับปุ่มในเมนูตั้งค่า)
 function toggleFabVisibility() {
@@ -717,11 +723,11 @@ function setupSettingsMenu() {
         extensionPanel.appendChild(container);
 
         // ผูก Event ให้ปุ่มใน Settings
-        document.getElementById('btn-toggle-phone').addEventListener('click', togglePhone);
-        document.getElementById('btn-toggle-fab').addEventListener('click', toggleFabVisibility);
+        document.getElementById('btn-toggle-phone')?.addEventListener('click', togglePhone);
+        document.getElementById('btn-toggle-fab')?.addEventListener('click', toggleFabVisibility);
 
         // ปุ่มทดสอบการแจ้งเตือน
-        document.getElementById('btn-test-notification').addEventListener('click', () => {
+        document.getElementById('btn-test-notification')?.addEventListener('click', () => {
             triggerNotification();
         });
     }
