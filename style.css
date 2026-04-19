@@ -1,11 +1,12 @@
-/* --- Floating Button (แก้ปุ่มตกขอบมือถือ) --- */
+/* --- Floating Button (ย้ายมาอยู่กลางขวา และลากติดนิ้ว) --- */
 #st-phone-fab {
     position: fixed;
-    /* เปลี่ยนมาใช้ bottom และ right แทน เพื่อให้เกาะมุมขวาล่างเสมอ ไม่สนความสูงจอ */
-    bottom: 20px;
-    right: 20px;
-    top: auto;
-    left: auto;
+
+    /* ย้ายมาอยู่กลางจอแนวตั้ง เยื้องขวา */
+    top: 50vh;
+    margin-top: -30px; /* ขยับขึ้นครึ่งนึงของความสูงปุ่ม */
+    right: 15px;
+
     width: 60px;
     height: 60px;
     background-color: #3b82f6;
@@ -17,9 +18,10 @@
     justify-content: center;
     align-items: center;
     font-size: 24px;
-    transition: transform 0.2s, background-color 0.2s;
     user-select: none;
     touch-action: none;
+
+    /* ลบ transition ออก เพื่อให้ลากปุ่มได้ลื่นไหล ไม่หน่วงตามนิ้ว */
 }
 
 #st-phone-fab:active {
@@ -52,16 +54,18 @@
     display: none; /* ซ่อนไว้ก่อน */
 }
 
-/* --- Phone Container (บังคับให้อยู่ตรงกลางเสมอ) --- */
+/* --- Phone Container (จัดกึ่งกลางด้วย calc รองรับมือถือ 100%) --- */
 #st-phone-container {
     position: fixed;
-    /* บังคับให้อยู่กึ่งกลางจอเป๊ะๆ */
-    left: 50% !important;
-    transform: translateX(-50%) !important;
+    /* จัดกึ่งกลางจอ: 50vw ลบด้วยครึ่งนึงของความกว้างโทรศัพท์ (350/2 = 175px) */
+    left: calc(50vw - 175px);
+
+    /* ให้โทรศัพท์ลอยอยู่เหนือขอบล่างนิดนึง (หรือจะใช้ top: 10vh แบบที่คุณ Lou เสนอก็ได้ครับ) */
     bottom: 90px;
+
     width: 350px;
     height: 700px;
-    max-height: 85vh; /* ไม่ให้สูงเกินหน้าจอ */
+    max-height: 85vh;
     background-color: #1e1e1e;
     border: 10px solid #333;
     border-radius: 30px;
@@ -70,7 +74,8 @@
     display: none;
     flex-direction: column;
     overflow: hidden;
-    transition: all 0.3s ease;
+    /* เอา transform ออกจาก transition ตามที่คุณ Lou แนะนำ เพื่อลดอาการหน่วง */
+    transition: opacity 0.3s ease;
 }
 
 /* หน้าจอภายในโทรศัพท์ */
@@ -81,17 +86,17 @@
     position: relative;
 }
 
-/* --- Responsive สำหรับมือถือและการย่อจอ (max-width: 768px) --- */
-
 /* --- Responsive สำหรับมือถือ (max-width: 768px) --- */
 @media (max-width: 768px) {
     #st-phone-container {
-        width: 90vw !important; /* กว้าง 90% ของจอมือถือ */
-        max-width: 400px !important;
-        height: 80vh !important; /* สูง 80% ของจอมือถือ */
-        bottom: 80px !important; /* ลอยขึ้นมานิดนึงไม่ให้ทับปุ่ม */
-        border-width: 5px !important; /* ขอบบางลงบนมือถือ */
-        border-radius: 20px !important;
+        width: 90vw;
+        /* จัดกึ่งกลางบนมือถือ: 50vw ลบด้วยครึ่งนึงของ 90vw (คือ 45vw) */
+        left: calc(50vw - 45vw);
+
+        height: 80vh;
+        bottom: 80px;
+        border-width: 5px;
+        border-radius: 20px;
     }
 }
 
