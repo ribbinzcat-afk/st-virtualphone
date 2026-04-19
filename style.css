@@ -720,8 +720,29 @@
     padding: 15px; border-bottom: 1px solid #dbdbdb; font-weight: bold;
 }
 
-.ig-create-btn { color: #0095f6; cursor: pointer; font-weight: bold; }
-.ig-create-btn.cancel { color: #262626; font-weight: normal; }
+/* ขยายพื้นที่กด (Hitbox) ให้ปุ่ม Share และ Cancel บนมือถือ */
+.ig-create-btn {
+    color: #0095f6;
+    cursor: pointer;
+    font-weight: bold;
+    /* เพิ่ม Padding ให้พื้นที่กดใหญ่ขึ้น */
+    padding: 15px;
+    /* ดึง Margin กลับเพื่อให้ปุ่มยังชิดขอบจอเหมือนเดิม */
+    margin: -15px;
+    /* ป้องกันการคลุมดำข้อความตอนจิ้มพลาด */
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.ig-create-btn.cancel {
+    color: #262626;
+    font-weight: normal;
+}
+
+/* เพิ่ม Effect ตอนเอานิ้วแตะ ให้รู้ว่ากดติดแล้ว */
+.ig-create-btn:active {
+    opacity: 0.5;
+}
 
 .ig-create-content { padding: 15px; display: flex; flex-direction: column; gap: 15px; }
 
