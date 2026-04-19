@@ -211,3 +211,154 @@
     overflow-y: auto;
     font-family: sans-serif;
 }
+
+/* =========================================
+   LINE APP UI (เลียนแบบของจริง)
+========================================= */
+
+/* ปรับแต่ง Header ของ Line ให้เป็นสีน้ำเงินเข้ม/เทาดำ (ตามธีม Line ปัจจุบัน) */
+#window-line .st-app-header {
+    background-color: #f5f6f6;
+    color: #111;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 15px;
+}
+
+#window-line .st-back-btn {
+    color: #111;
+    font-weight: normal;
+}
+
+.line-header-icons {
+    font-size: 18px;
+    color: #111;
+    letter-spacing: 15px;
+    margin-right: -15px; /* ชดเชย letter-spacing ตัวสุดท้าย */
+}
+
+/* พื้นที่แชทของ Line (สีฟ้าอมเทา) */
+#content-line {
+    background-color: #8bacce;
+    padding: 15px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    overflow-y: auto;
+    /* เผื่อพื้นที่ให้แถบพิมพ์ข้อความด้านล่าง */
+    padding-bottom: 70px;
+}
+
+/* --- บับเบิลแชท (Chat Bubbles) --- */
+.line-msg-wrapper {
+    display: flex;
+    align-items: flex-start;
+    max-width: 85%;
+}
+
+.line-msg-wrapper.my-message {
+    align-self: flex-end;
+    flex-direction: row-reverse;
+}
+
+.line-msg-wrapper.other-message {
+    align-self: flex-start;
+}
+
+/* รูป Avatar ฝั่งคนอื่น */
+.line-avatar {
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    background-color: #ccc;
+    background-size: cover;
+    background-position: center;
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.line-msg-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.line-sender-name {
+    font-size: 11px;
+    color: #333;
+    margin-bottom: 3px;
+    margin-left: 5px;
+}
+
+.line-bubble {
+    padding: 8px 12px;
+    border-radius: 15px;
+    font-size: 14px;
+    line-height: 1.4;
+    position: relative;
+    word-wrap: break-word;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* บับเบิลฝั่งเรา (สีเขียว) */
+.my-message .line-bubble {
+    background-color: #85e04f;
+    color: #000;
+    border-top-right-radius: 4px;
+}
+
+/* บับเบิลฝั่งคนอื่น (สีขาว) */
+.other-message .line-bubble {
+    background-color: #ffffff;
+    color: #000;
+    border-top-left-radius: 4px;
+}
+
+/* เวลาที่ส่งข้อความ */
+.line-time {
+    font-size: 10px;
+    color: #555;
+    align-self: flex-end;
+    margin: 0 5px;
+    margin-bottom: 2px;
+}
+
+/* --- แถบพิมพ์ข้อความด้านล่าง (Input Area) --- */
+.line-input-area {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background-color: #f5f6f6;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    border-top: 1px solid #ddd;
+    box-sizing: border-box;
+    gap: 10px;
+}
+
+.line-icon-btn {
+    font-size: 20px;
+    color: #777;
+    cursor: pointer;
+}
+
+.line-input-field {
+    flex: 1;
+    border: none;
+    background-color: #fff;
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    outline: none;
+}
+
+.line-send-btn {
+    color: #007bff;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 14px;
+    display: none; /* ซ่อนไว้จนกว่าจะพิมพ์ */
+}

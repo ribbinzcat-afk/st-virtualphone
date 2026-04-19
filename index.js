@@ -57,16 +57,60 @@ function createPhoneUI() {
         const appWindow = document.createElement('div');
         appWindow.id = `window-${app.id}`;
         appWindow.className = 'st-app-window';
-        appWindow.innerHTML = `
-            <div class="st-app-header">
-                <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮ Back</div>
-                <div>${app.name}</div>
-            </div>
-            <div class="st-app-content" id="content-${app.id}">
-                <p>Welcome to ${app.name} App!</p>
-                <!-- เนื้อหาแอปจะมาใส่ตรงนี้ใน Phase ต่อไป -->
-            </div>
-        `;
+
+        if (app.id === 'line') {
+            // --- โครงสร้างแอป LINE ---
+            appWindow.innerHTML = `
+                <div class="st-app-header">
+                    <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
+                    <div id="line-chat-title">Rex (เร็กซ์)</div>
+                    <div class="line-header-icons">📞 ≡</div>
+                </div>
+                <div class="st-app-content" id="content-${app.id}">
+                    <!-- ตัวอย่างข้อความฝั่งคนอื่น -->
+                    <div class="line-msg-wrapper other-message">
+                        <div class="line-avatar" style="background-image: url('https://i.pravatar.cc/100?img=11');"></div>
+                        <div class="line-msg-content">
+                            <div class="line-sender-name">Rex</div>
+                            <div style="display: flex;">
+                                <div class="line-bubble">ตื่นหรือยัง? วันนี้มีภารกิจนะ</div>
+                                <div class="line-time">08:30</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ตัวอย่างข้อความฝั่งเรา -->
+                    <div class="line-msg-wrapper my-message">
+                        <div class="line-msg-content">
+                            <div style="display: flex; flex-direction: row-reverse;">
+                                <div class="line-bubble">ตื่นแล้วๆ กำลังเตรียมตัวอยู่!</div>
+                                <div class="line-time">08:32</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- แถบพิมพ์ข้อความ -->
+                <div class="line-input-area">
+                    <div class="line-icon-btn">＋</div>
+                    <div class="line-icon-btn">📷</div>
+                    <div class="line-icon-btn">😊</div>
+                    <input type="text" class="line-input-field" id="line-input" placeholder="Aa">
+                    <div class="line-icon-btn" id="line-mic-icon">🎤</div>
+                    <div class="line-send-btn" id="line-send-btn">Send</div>
+                </div>
+            `;
+        } else {
+            // --- โครงสร้างแอปอื่นๆ (ยังเหมือนเดิม) ---
+            appWindow.innerHTML = `
+                <div class="st-app-header">
+                    <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮ Back</div>
+                    <div>${app.name}</div>
+                </div>
+                <div class="st-app-content" id="content-${app.id}">
+                    <p>Welcome to ${app.name} App!</p>
+                </div>
+            `;
+        }
         screen.appendChild(appWindow);
     });
 
@@ -79,6 +123,35 @@ function createPhoneUI() {
             togglePhone();
         }
     });
+
+        // --- Event สำหรับช่องพิมพ์ Line ---
+    const lineInput = document.getElementById('line-input');
+    const lineMicIcon = document.getElementById('line-mic-icon');
+    const lineSendBtn = document.getElementById('line-send-btn');
+
+    if (lineInput) {
+        lineInput.addEventListener('input', () => {
+            if (lineInput.value.trim() !== "") {
+                lineMicIcon.style.display = 'none';
+                lineSendBtn.style.display = 'block';
+            } else {
+                lineMicIcon.style.display = 'block';
+                lineSendBtn.style.display = 'none';
+            }
+        });
+
+        // Event กดปุ่ม Send (เดี๋ยวเราจะมาเขียน Logic ส่งข้อความไปหา AI ใน Phase ต่อไป)
+        lineSendBtn.addEventListener('click', () => {
+            const text = lineInput.value.trim();
+            if (text) {
+                console.log("ผู้ใช้ส่ง Line:", text);
+                // TODO: นำข้อความไปโชว์ในแชท Line และส่ง Prompt เบื้องหลังหา AI
+                lineInput.value = "";
+                lineInput.dispatchEvent(new Event('input')); // รีเซ็ตปุ่ม
+            }
+        });
+    }
+
 }
 
 // --- ฟังก์ชันทำให้ปุ่มลากได้ (Draggable) ---
