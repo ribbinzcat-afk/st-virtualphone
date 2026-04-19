@@ -784,16 +784,16 @@ function triggerNotification(appId) {
 }
 
 // --- ฟังก์ชันทำให้ปุ่มลากได้ (Draggable) ---
+// --- ฟังก์ชันทำให้ปุ่มลากได้ (อัปเดตให้รองรับมือถือ 100%) ---
 function makeDraggable(element) {
-    let currentX;
-    let currentY;
+    let currentX = 0;
+    let currentY = 0;
     let initialX;
     let initialY;
     let xOffset = 0;
     let yOffset = 0;
     let active = false;
 
-    // รองรับทั้งเมาส์ (คอม) และนิ้ว (มือถือ)
     element.addEventListener("touchstart", dragStart, { passive: false });
     document.addEventListener("touchend", dragEnd, false);
     document.addEventListener("touchmove", drag, { passive: false });
@@ -811,10 +811,9 @@ function makeDraggable(element) {
             initialY = e.clientY - yOffset;
         }
 
-        // เช็คว่ากดที่ตัวปุ่มจริงๆ
         if (e.target === element || element.contains(e.target)) {
             active = true;
-            isDragging = false; // รีเซ็ตสถานะ
+            isDragging = false;
         }
     }
 
@@ -822,17 +821,13 @@ function makeDraggable(element) {
         initialX = currentX;
         initialY = currentY;
         active = false;
-
-        // หน่วงเวลาเล็กน้อยก่อนรีเซ็ต isDragging เพื่อให้ Event Click ทำงานได้ถูกต้อง
-        setTimeout(() => {
-            isDragging = false;
-        }, 50);
+        setTimeout(() => { isDragging = false; }, 50);
     }
 
     function drag(e) {
         if (active) {
-            e.preventDefault(); // ป้องกันพฤติกรรมแปลกๆ บนมือถือ
-            isDragging = true; // ตั้งสถานะว่ากำลังลากอยู่ (จะไม่เปิดโทรศัพท์)
+            e.preventDefault();
+            isDragging = true;
 
             if (e.type === "touchmove") {
                 currentX = e.touches[0].clientX - initialX;
@@ -845,51 +840,17 @@ function makeDraggable(element) {
             xOffset = currentX;
             yOffset = currentY;
 
-            // อัปเดตตำแหน่งปุ่ม
-            setTranslate(currentX, currentY, element);
+            // ขยับปุ่ม
+            element.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
         }
     }
 
-    function setTranslate(xPos, yPos, el) {
-        el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
-    }
-
-    // --- ป้องกันปุ่มหายเมื่อย่อ/ขยายหน้าจอ (Window Resize) ---
+    // กันปุ่มหายตอนหมุนจอหรือย่อจอ
     window.addEventListener('resize', () => {
-        const rect = element.getBoundingClientRect();
-        const winWidth = window.innerWidth;
-        const winHeight = window.innerHeight;
-
-        let needsAdjustment = false;
-        let newX = xOffset;
-        let newY = yOffset;
-
-        // เช็คว่าปุ่มทะลุขอบขวาหรือล่างไหม
-        if (rect.right > winWidth) {
-            newX = xOffset - (rect.right - winWidth) - 20; // ถอยกลับมา 20px
-            needsAdjustment = true;
-        }
-        if (rect.bottom > winHeight) {
-            newY = yOffset - (rect.bottom - winHeight) - 20;
-            needsAdjustment = true;
-        }
-
-        // เช็คว่าปุ่มทะลุขอบซ้ายหรือบนไหม
-        if (rect.left < 0) {
-            newX = xOffset - rect.left + 20;
-            needsAdjustment = true;
-        }
-        if (rect.top < 0) {
-            newY = yOffset - rect.top + 20;
-            needsAdjustment = true;
-        }
-
-        // ถ้าปุ่มตกขอบ ให้เด้งกลับเข้ามาในจอ
-        if (needsAdjustment) {
-            xOffset = newX;
-            yOffset = newY;
-            setTranslate(newX, newY, element);
-        }
+        // รีเซ็ตตำแหน่งกลับไปที่ขวาล่างสุด (ตำแหน่งเริ่มต้น) เพื่อป้องกันปุ่มหลุดขอบจอ
+        xOffset = 0;
+        yOffset = 0;
+        element.style.transform = `translate3d(0px, 0px, 0)`;
     });
 }
 
