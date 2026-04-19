@@ -4,6 +4,6 @@
     "description": "เพิ่มสมาร์ทโฟนจำลองสำหรับการ Roleplay แบบ Slice of Life",
     "version": "1.0.0",
     "author": "Lou & Assistant",
-    "main": "index.js",
+    "js": "index.js",
     "css": "style.css"
 }
