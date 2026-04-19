@@ -5,6 +5,34 @@ import { eventSource, event_types } from "../../../../script.js";
 // --- ระบบจัดการประวัติแชท (Local Storage) ---
 const STORAGE_KEY = 'st_virtualphone_line_history';
 
+// --- ระบบฐานข้อมูลรูปภาพ (IndexedDB) ---
+let imageDB;
+const DB_NAME = "STVirtualPhoneDB";
+const STORE_NAME = "images";
+
+// ฟังก์ชันเริ่มต้นฐานข้อมูล
+function initImageDB() {
+    const request = indexedDB.open(DB_NAME, 1);
+
+    request.onupgradeneeded = function(event) {
+        imageDB = event.target.result;
+        // สร้างตารางเก็บข้อมูล โดยใช้ id (เช่น sticker_cat_cry) เป็นคีย์หลัก
+        if (!imageDB.objectStoreNames.contains(STORE_NAME)) {
+            imageDB.createObjectStore(STORE_NAME, { keyPath: "id" });
+        }
+    };
+
+    request.onsuccess = function(event) {
+        imageDB = event.target.result;
+        console.log("📱 Image Database Loaded!");
+        loadSavedImages(); // โหลดรูปมาแสดงในหน้า Settings ทันทีที่ DB พร้อม
+    };
+
+    request.onerror = function(event) {
+        console.error("📱 Database Error:", event.target.error);
+    };
+}
+
 // โหลดประวัติแชททั้งหมดจาก Storage
 function getAllLineHistory() {
     const data = localStorage.getItem(STORAGE_KEY);
@@ -227,10 +255,15 @@ function createPhoneUI() {
                             <input type="color" id="setting-phone-color" value="#333333" class="settings-input" style="width: 50px; padding: 0;">
                         </div>
                         <div class="settings-row">
-                            <span>Wallpaper URL</span>
-                            <input type="text" id="setting-wallpaper-url" placeholder="Paste image link here" class="settings-input">
+                            <span>Wallpaper</span>
+                            <input type="text" id="setting-wallpaper-url" placeholder="Image URL or Upload Base64" class="settings-input">
                         </div>
-                        <button class="settings-btn" style="width: 100%;" onclick="applyPhoneSettings()">Apply Changes</button>
+                        <!-- เพิ่มปุ่มอัปโหลดไฟล์ตรงนี้ -->
+                        <div class="settings-row">
+                            <input type="file" id="setting-wallpaper-file" accept="image/*" style="width: 70%; font-size: 12px;">
+                            <button class="settings-btn" onclick="uploadWallpaperFile()">Upload</button>
+                        </div>
+                        <button class="settings-btn" style="width: 100%; margin-top: 10px;" onclick="applyPhoneSettings()">Apply Changes</button>
                     </div>
 
                     <!-- ส่วนที่ 2: จัดการรูปภาพ (Sticker / IG) -->
@@ -296,32 +329,31 @@ function createPhoneUI() {
             }
         });
 
-        // เมื่อกดปุ่ม Send
+        // เมื่อกดปุ่ม Send Line
         lineSendBtn.addEventListener('click', () => {
             const text = lineInput.value.trim();
             if (text) {
-                const context = getContext();
-                const myName = context.name1 || "Me"; // ชื่อผู้เล่น
-                const charName = context.name2 || "Character"; // ชื่อบอท
+                // 1. นำข้อความไปโชว์ในแชท Line ฝั่งเรา
+                addMessageToLineUI(currentActiveLineChat, text, true);
 
-                // 1. นำข้อความไปโชว์ในแชท Line ฝั่งเรา (สีเขียว)
-                addMessageToLineUI(myName, text, true);
+                // 2. ดึงรายชื่อสติกเกอร์ที่มีทั้งหมดเพื่อส่งไปบอก AI
+                let availableStickers = "none";
+                if (imageDB) {
+                    const tx = imageDB.transaction([STORE_NAME], "readonly");
+                    const req = tx.objectStore(STORE_NAME).getAll();
+                    req.onsuccess = function(e) {
+                        const stickers = e.target.result.filter(img => img.type === 'sticker').map(img => img.keyword);
+                        if (stickers.length > 0) availableStickers = stickers.join(', ');
 
-                // 2. ส่งข้อความเบื้องหลังไปให้ AI ในหน้าต่างแชทหลักของ ST
-                // เราจะใส่ฟอร์แมต [Line: ข้อความ] เพื่อให้ AI รู้ว่าเราตอบผ่านแอป
-                const hiddenPrompt = `[Line ไปหา ${currentActiveLineChat}: ${text}]`;
-
-                // นำข้อความไปใส่ในกล่องพิมพ์ของ ST และกดส่งอัตโนมัติ
-                const stTextarea = document.getElementById('send_textarea');
-                const stSendBtn = document.getElementById('send_but');
-
-                if (stTextarea && stSendBtn) {
-                    stTextarea.value = hiddenPrompt;
-                    stTextarea.dispatchEvent(new Event('input', { bubbles: true }));
-                    stSendBtn.click();
+                        // 3. ส่งข้อความเบื้องหลังไปให้ AI
+                        const hiddenPrompt = `[Line ไปหา ${currentActiveLineChat}: ${text}] (OOC: คุณสามารถส่งสติกเกอร์ตอบกลับได้โดยพิมพ์ [Sticker: keyword] คีย์เวิร์ดที่คุณมีคือ: ${availableStickers})`;
+                        sendHiddenPrompt(hiddenPrompt);
+                    };
+                } else {
+                    const hiddenPrompt = `[Line ไปหา ${currentActiveLineChat}: ${text}]`;
+                    sendHiddenPrompt(hiddenPrompt);
                 }
 
-                // รีเซ็ตช่องพิมพ์
                 lineInput.value = "";
                 lineInput.dispatchEvent(new Event('input'));
             }
@@ -454,6 +486,28 @@ function handleNewMessage(messageId) {
         triggerNotification('line');
 
         return `<span style="display:none;" class="hidden-line-msg">${match}</span>`;
+    });
+
+        // 1.5 ดักจับสติกเกอร์ใน Line - รูปแบบ: [Sticker: คีย์เวิร์ด] หรือ [Sticker|คีย์เวิร์ด]
+    const stickerRegex = /\[Sticker[:|]\s*(.*?)\]/gi;
+    text = text.replace(stickerRegex, (match, keyword) => {
+        const cleanKeyword = keyword.trim().toLowerCase();
+        const context = getContext();
+        const sender = context.name2 || "Unknown";
+
+        // สร้าง HTML พิเศษสำหรับสติกเกอร์ (ใส่คลาส st-async-sticker เพื่อรอโหลดรูป)
+        const stickerHtml = `<div class="st-async-sticker" data-keyword="${cleanKeyword}" style="width: 120px; height: 120px; background-color: #eee; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #888;">Loading Sticker...</div>`;
+
+        // นำไปแสดงใน Line
+        addMessageToLineUI(sender, stickerHtml, false);
+
+        // สั่งให้ไปดึงรูปจาก DB มาใส่
+        fetchAndRenderSticker(cleanKeyword);
+
+        hasNotification = true;
+        triggerNotification('line');
+
+        return `<span style="display:none;" class="hidden-sticker-msg">${match}</span>`;
     });
 
     // 2. ดักจับแอป Phone (สายเรียกเข้า) - รูปแบบ: [Call|ชื่อคนโทร] หรือ [Call: ชื่อคนโทร]
@@ -999,6 +1053,159 @@ window.applyPhoneSettings = function() {
 
     alert("Phone settings applied!");
 };
+
+// ฟังก์ชันอัปโหลดและแปลงไฟล์ Wallpaper เป็น Base64
+window.uploadWallpaperFile = function() {
+    const fileInput = document.getElementById('setting-wallpaper-file');
+    const file = fileInput.files[0];
+
+    if (!file) {
+        alert("กรุณาเลือกไฟล์รูปภาพก่อนครับ");
+        return;
+    }
+
+    // ตรวจสอบขนาดไฟล์ (ไม่ควรเกิน 2MB เพื่อป้องกัน LocalStorage เต็ม)
+    if (file.size > 2 * 1024 * 1024) {
+        alert("ไฟล์ใหญ่เกินไปครับ กรุณาใช้รูปภาพขนาดไม่เกิน 2MB");
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64String = e.target.result;
+
+        // นำ Base64 ไปใส่ในช่อง URL
+        const wpInput = document.getElementById('setting-wallpaper-url');
+        if (wpInput) wpInput.value = base64String;
+
+        // บังคับกด Apply ให้อัตโนมัติ
+        applyPhoneSettings();
+
+        // ล้างค่าช่องเลือกไฟล์
+        fileInput.value = "";
+    };
+    reader.readAsDataURL(file);
+};
+
+// --- ฟังก์ชันจัดการรูปภาพ (Settings UI) ---
+
+// อัปโหลดรูปลงฐานข้อมูล
+window.uploadImageToDB = function() {
+    const type = document.getElementById('image-upload-type').value; // 'sticker' หรือ 'ig'
+    const keyword = document.getElementById('image-keyword').value.trim();
+    const fileInput = document.getElementById('image-file-input');
+    const file = fileInput.files[0];
+
+    if (!keyword || !file) {
+        alert("กรุณากรอก Keyword และเลือกไฟล์รูปภาพครับ");
+        return;
+    }
+
+    // ป้องกันการเว้นวรรคใน Keyword
+    const safeKeyword = keyword.replace(/\s+/g, '_').toLowerCase();
+    const id = `${type}_${safeKeyword}`;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64 = e.target.result;
+
+        const transaction = imageDB.transaction([STORE_NAME], "readwrite");
+        const store = transaction.objectStore(STORE_NAME);
+
+        const imageData = {
+            id: id,
+            type: type,
+            keyword: safeKeyword,
+            data: base64
+        };
+
+        const request = store.put(imageData);
+        request.onsuccess = function() {
+            alert(`บันทึก ${type} [${safeKeyword}] สำเร็จ!`);
+            document.getElementById('image-keyword').value = "";
+            fileInput.value = "";
+            loadSavedImages(); // รีเฟรชรายการ
+        };
+    };
+    reader.readAsDataURL(file);
+};
+
+// โหลดรูปภาพทั้งหมดมาแสดงใน Settings
+function loadSavedImages() {
+    if (!imageDB) return;
+
+    const transaction = imageDB.transaction([STORE_NAME], "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.getAll();
+
+    request.onsuccess = function(event) {
+        const images = event.target.result;
+        const container = document.getElementById('sticker-list-container');
+        if (!container) return;
+
+        if (images.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: #888; font-size: 12px;">No images saved yet.</div>';
+            return;
+        }
+
+        container.innerHTML = ''; // ล้างของเก่า
+        images.forEach(img => {
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'saved-image-item';
+            itemDiv.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <img src="${img.data}" class="saved-image-preview">
+                    <div>
+                        <div style="font-weight: bold; font-size: 12px;">${img.keyword}</div>
+                        <div style="font-size: 10px; color: #888; text-transform: uppercase;">${img.type}</div>
+                    </div>
+                </div>
+                <button class="settings-btn settings-btn-danger" style="padding: 5px 8px; font-size: 12px;" onclick="deleteImageFromDB('${img.id}')">Delete</button>
+            `;
+            container.appendChild(itemDiv);
+        });
+    };
+}
+
+// ลบรูปภาพออกจากฐานข้อมูล
+window.deleteImageFromDB = function(id) {
+    if (!confirm("ต้องการลบรูปภาพนี้ใช่ไหม?")) return;
+
+    const transaction = imageDB.transaction([STORE_NAME], "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    store.delete(id);
+
+    transaction.oncomplete = function() {
+        loadSavedImages();
+    };
+};
+
+// ดึงรูปสติกเกอร์จาก DB มาแสดงแทน Placeholder
+function fetchAndRenderSticker(keyword) {
+    if (!imageDB) return;
+
+    const transaction = imageDB.transaction([STORE_NAME], "readonly");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.get(`sticker_${keyword}`);
+
+    request.onsuccess = function(event) {
+        const result = event.target.result;
+
+        // ค้นหา Placeholder ทั้งหมดที่รอสติกเกอร์ตัวนี้อยู่
+        const placeholders = document.querySelectorAll(`.st-async-sticker[data-keyword="${keyword}"]`);
+
+        placeholders.forEach(el => {
+            if (result && result.data) {
+                // ถ้ารูปมีในระบบ ให้เปลี่ยนเป็นแท็ก <img>
+                el.outerHTML = `<img src="${result.data}" style="max-width: 150px; max-height: 150px; border-radius: 10px; background-color: transparent;">`;
+            } else {
+                // ถ้าไม่มีรูปในระบบ
+                el.innerText = `[Sticker not found: ${keyword}]`;
+                el.style.backgroundColor = "#ffdddd";
+            }
+        });
+    };
+}
 
 // เรียกใช้ฟังก์ชันนี้ตอนโหลด Extension เพื่อตั้งค่าสีและวอลเปเปอร์เริ่มต้น
 jQuery(async () => {
