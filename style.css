@@ -79,25 +79,24 @@
 }
 
 /* --- Phone Container (อัปเกรดให้อยู่บนสุดและตรงกลาง 100%) --- */
+/* --- Phone Container (ลอยตรงกลางหน้าจอเป๊ะๆ) --- */
 #st-phone-container {
     position: fixed;
 
-    /* เทคนิคจัดกึ่งกลางที่เสถียรที่สุดบนทุกเบราว์เซอร์ */
-    left: 0;
-    right: 0;
-    margin-left: auto;
-    margin-right: auto;
-    bottom: 90px;
+    /* สูตรจัดกึ่งกลางหน้าจอ 100% (ทั้งแนวตั้งและแนวนอน) */
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    margin: 0 !important;
 
     width: 350px;
     height: 700px;
-    max-height: 85vh;
+    max-height: 85vh; /* ไม่ให้สูงเกิน 85% ของหน้าจอ (ป้องกันทะลุขอบบน/ล่าง) */
+
     background-color: #1e1e1e;
     border: 10px solid #333;
     border-radius: 30px;
-    box-shadow: 0 20px 50px rgba(0,0,0,0.8); /* เพิ่มเงาให้เข้มขึ้นจะได้เห็นชัดๆ */
-
-    /* ดัน z-index ให้สูงทะลุฟ้า จะได้ไม่โดน ST บัง */
+    box-shadow: 0 20px 50px rgba(0,0,0,0.8);
     z-index: 999999 !important;
 
     display: none;
@@ -116,13 +115,13 @@
 /* --- Responsive สำหรับมือถือ (max-width: 768px) --- */
 @media (max-width: 768px) {
     #st-phone-container {
-        width: 90vw !important;
+        width: 90vw !important; /* กว้าง 90% ของจอมือถือ */
         max-width: 400px !important;
-        height: 80vh !important;
-        bottom: 50% !important; /* ดันขึ้นมาตรงกลางจอ */
-        transform: translateY(50%) !important; /* จัดให้อยู่ตรงกลางจอแนวตั้งพอดี */
+        height: 85vh !important; /* สูง 85% ของจอมือถือ */
         border-width: 5px !important;
         border-radius: 20px !important;
+
+        /* ไม่ต้องแก้ top/left/transform เพราะสูตรด้านบนครอบคลุมมือถือแล้ว */
     }
 }
 
