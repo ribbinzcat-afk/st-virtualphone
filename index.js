@@ -5,6 +5,78 @@ import { eventSource, event_types } from "../../../../script.js";
 // --- ระบบจัดการประวัติแชท (Local Storage) ---
 const STORAGE_KEY = 'st_virtualphone_line_history';
 
+// --- ระบบจัดการประวัติ IG (Local Storage) ---
+const IG_STORAGE_KEY = 'st_virtualphone_ig_history';
+
+// โหลดประวัติ IG ทั้งหมด
+function getAllIGHistory() {
+    const data = localStorage.getItem(IG_STORAGE_KEY);
+    return data ? JSON.parse(data) : {};
+}
+
+// โหลดประวัติ IG มาแสดงบนหน้าจอ
+function loadIGHistoryForCurrentChar() {
+    const context = getContext();
+    const charId = context.characterId;
+    if (!charId) return;
+
+    const allHistory = getAllIGHistory();
+    const charPosts = allHistory[charId] || [];
+
+    const contentIG = document.getElementById('content-ig');
+    if (!contentIG) return;
+
+    // ล้างหน้าจอเดิม
+    contentIG.innerHTML = '';
+
+    if (charPosts.length === 0) {
+        contentIG.innerHTML = '<div id="ig-empty-state" style="text-align: center; padding: 20px; color: #888;">No posts yet.</div>';
+        return;
+    }
+
+    // นำประวัติมาแสดง (เรียงจากโพสต์ล่าสุดไปเก่าสุด)
+    charPosts.forEach(post => {
+        renderIGPostUI_FromHistory(post);
+    });
+}
+
+// บันทึกโพสต์ใหม่ลง Storage
+function saveIGPostToStorage(postData) {
+    const context = getContext();
+    const charId = context.characterId;
+    if (!charId) return;
+
+    const allHistory = getAllIGHistory();
+    if (!allHistory[charId]) {
+        allHistory[charId] = [];
+    }
+
+    // เพิ่มโพสต์ใหม่ไว้บนสุด
+    allHistory[charId].unshift(postData);
+    localStorage.setItem(IG_STORAGE_KEY, JSON.stringify(allHistory));
+}
+
+// บันทึกคอมเมนต์ลงในโพสต์ที่มีอยู่
+function saveIGCommentToStorage(postId, commentData) {
+    const context = getContext();
+    const charId = context.characterId;
+    if (!charId) return;
+
+    const allHistory = getAllIGHistory();
+    if (!allHistory[charId]) return;
+
+    // หาโพสต์ที่ตรงกับ postId
+    const postIndex = allHistory[charId].findIndex(p => p.postId === postId);
+    if (postIndex !== -1) {
+        if (!allHistory[charId][postIndex].comments) {
+            allHistory[charId][postIndex].comments = [];
+        }
+        // เพิ่มคอมเมนต์ต่อท้าย
+        allHistory[charId][postIndex].comments.push(commentData);
+        localStorage.setItem(IG_STORAGE_KEY, JSON.stringify(allHistory));
+    }
+}
+
 // --- ระบบฐานข้อมูลรูปภาพ (IndexedDB) ---
 let imageDB;
 const DB_NAME = "STVirtualPhoneDB";
@@ -507,6 +579,7 @@ function setupMessageHook() {
         // โหลดประวัติแชทของตัวละครนี้ขึ้นมาแสดง
         loadLineHistoryForCurrentChar();
         updateLineChatList();
+        loadIGHistoryForCurrentChar(); 
     });
 
 }
@@ -1379,28 +1452,50 @@ window.submitIGPost = function() {
     closeIGCreatePost();
 };
 
-// 4. ฟังก์ชันหลักสำหรับสร้าง UI โพสต์ (ใช้ร่วมกันทั้งเราและ AI)
+// ฟังก์ชันหลักสำหรับสร้าง UI โพสต์ (เมื่อมีการโพสต์ใหม่)
 window.renderIGPostUI = function(senderName, imageSource, caption, sourceType = 'base64', keyword = '') {
+    const postId = 'post_' + Date.now();
+    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // สร้าง Object ข้อมูลโพสต์เพื่อนำไปเซฟ
+    const postData = {
+        postId: postId,
+        senderName: senderName,
+        imageSource: imageSource,
+        caption: caption,
+        sourceType: sourceType,
+        keyword: keyword,
+        timeString: timeString,
+        comments: []
+    };
+
+    // 1. เซฟลง Storage
+    saveIGPostToStorage(postData);
+
+    // 2. แสดงผลบนหน้าจอ
+    renderIGPostUI_FromHistory(postData);
+    latestPostId = postId;
+};
+
+// ฟังก์ชันสร้าง UI โพสต์จากข้อมูล (ใช้ทั้งตอนโพสต์ใหม่และตอนโหลดประวัติ)
+window.renderIGPostUI_FromHistory = function(postData) {
     const contentIG = document.getElementById('content-ig');
     const emptyState = document.getElementById('ig-empty-state');
     if (emptyState) emptyState.style.display = 'none';
 
-    const postId = 'post_' + Date.now();
-    latestPostId = postId; // อัปเดตโพสต์ล่าสุด
-    const avatarUrl = getAvatarUrl(senderName === (getContext().name1 || "Me"), senderName);
-    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    latestPostId = postData.postId;
+    const avatarUrl = getAvatarUrl(postData.senderName === (getContext().name1 || "Me"), postData.senderName);
 
     const postDiv = document.createElement('div');
     postDiv.className = 'ig-post';
-    postDiv.id = postId;
+    postDiv.id = postData.postId;
 
-    // โครงสร้าง HTML ของโพสต์
     postDiv.innerHTML = `
         <div class="ig-post-header">
             <div class="ig-avatar" style="background-image: url('${avatarUrl}');"></div>
-            <div class="ig-username">${senderName}</div>
+            <div class="ig-username">${postData.senderName}</div>
         </div>
-        <div class="ig-image-container" id="img-container-${postId}">
+        <div class="ig-image-container" id="img-container-${postData.postId}">
             <div style="color: #888; font-size: 12px;">Loading image...</div>
         </div>
         <div class="ig-actions">
@@ -1408,54 +1503,56 @@ window.renderIGPostUI = function(senderName, imageSource, caption, sourceType = 
             <div class="ig-action-icon">💬</div>
         </div>
         <div class="ig-caption-area">
-            <span class="ig-username">${senderName}</span> ${caption}
-            <div class="ig-time">${timeString}</div>
+            <span class="ig-username">${postData.senderName}</span> ${postData.caption}
+            <div class="ig-time">${postData.timeString}</div>
         </div>
-        <div class="ig-comments-area" id="comments-${postId}"></div>
+        <div class="ig-comments-area" id="comments-${postData.postId}"></div>
         <div class="ig-add-comment-box">
-            <input type="text" class="ig-comment-input" id="input-${postId}" placeholder="Add a comment...">
-            <button class="ig-comment-btn" onclick="sendIGComment('${postId}', '${senderName}')">Post</button>
+            <input type="text" class="ig-comment-input" id="input-${postData.postId}" placeholder="Add a comment...">
+            <button class="ig-comment-btn" onclick="sendIGComment('${postData.postId}', '${postData.senderName}')">Post</button>
         </div>
     `;
 
-    // แทรกโพสต์ไว้บนสุดของฟีด
-    contentIG.insertBefore(postDiv, contentIG.firstChild);
+    // แทรกโพสต์ต่อท้าย (เพราะตอนโหลดประวัติมันเรียงจากใหม่ไปเก่าอยู่แล้ว)
+    contentIG.appendChild(postDiv);
 
-    // --- จัดการการแสดงผลรูปภาพตามประเภท (sourceType) ---
-    const imgContainer = document.getElementById(`img-container-${postId}`);
-
-    if (sourceType === 'base64') {
-        // รูปที่ผู้ใช้อัปโหลดเอง (Base64) หรือรูปที่ได้ URL มาตรงๆ
-        imgContainer.innerHTML = `<img src="${imageSource}" class="ig-image" onerror="this.src='https://via.placeholder.com/400?text=Image+Error'">`;
+    // จัดการรูปภาพ
+    const imgContainer = document.getElementById(`img-container-${postData.postId}`);
+    if (postData.sourceType === 'base64') {
+        imgContainer.innerHTML = `<img src="${postData.imageSource}" class="ig-image" onerror="this.src='https://via.placeholder.com/400?text=Image+Error'">`;
     }
-    else if (sourceType === 'web') {
-        // AI สุ่มรูปจากเว็บ
-        const cleanKeyword = keyword.replace(/\s+/g, ',');
-        const randomNum = Math.floor(Math.random() * 1000);
-        const imageUrl = `https://loremflickr.com/400/400/${cleanKeyword}?random=${randomNum}`;
+    else if (postData.sourceType === 'web') {
+        const cleanKeyword = postData.keyword.replace(/\s+/g, ',');
+        // ใช้ postId เป็น seed แทน random เพื่อให้โหลดกี่ครั้งก็ได้รูปเดิม
+        const imageUrl = `https://loremflickr.com/400/400/${cleanKeyword}?lock=${postData.postId.replace('post_', '')}`;
         imgContainer.innerHTML = `<img src="${imageUrl}" class="ig-image" onerror="this.src='https://via.placeholder.com/400?text=Image+Not+Found'">`;
     }
-    else if (sourceType === 'local') {
-        // AI ดึงรูปจาก IndexedDB
+    else if (postData.sourceType === 'local') {
         if (imageDB) {
-            const cleanKeyword = keyword.trim().toLowerCase();
+            const cleanKeyword = postData.keyword.trim().toLowerCase();
             const transaction = imageDB.transaction([STORE_NAME], "readonly");
             const store = transaction.objectStore(STORE_NAME);
             const request = store.get(`ig_${cleanKeyword}`);
-
             request.onsuccess = function(event) {
                 const result = event.target.result;
                 if (result && result.data) {
                     imgContainer.innerHTML = `<img src="${result.data}" class="ig-image">`;
                 } else {
-                    imgContainer.innerHTML = `<div style="color: red; padding: 20px;">[Local Image Not Found: ${keyword}]</div>`;
+                    imgContainer.innerHTML = `<div style="color: red; padding: 20px;">[Local Image Not Found: ${postData.keyword}]</div>`;
                 }
             };
         }
     }
+
+    // โหลดคอมเมนต์เก่า (ถ้ามี)
+    if (postData.comments && postData.comments.length > 0) {
+        postData.comments.forEach(c => {
+            addCommentToUI_NoSave(postData.postId, c.name, c.text);
+        });
+    }
 };
 
-// 5. ผู้ใช้พิมพ์คอมเมนต์
+// ผู้ใช้พิมพ์คอมเมนต์ (เซฟ + แสดงผล + ส่ง AI)
 window.sendIGComment = function(postId, postOwner) {
     const input = document.getElementById(`input-${postId}`);
     const text = input.value.trim();
@@ -1463,17 +1560,20 @@ window.sendIGComment = function(postId, postOwner) {
 
     const myName = getContext().name1 || "Me";
 
-    // โชว์คอมเมนต์บนหน้าจอ
-    addCommentToUI(postId, myName, text);
+    // 1. เซฟคอมเมนต์ลง Storage
+    saveIGCommentToStorage(postId, { name: myName, text: text });
 
-    // ส่ง Prompt เบื้องหลัง
+    // 2. โชว์คอมเมนต์บนหน้าจอ
+    addCommentToUI_NoSave(postId, myName, text);
+
+    // 3. ส่ง Prompt เบื้องหลัง
     sendHiddenPrompt(`[IG Comment จาก ${myName} ไปที่โพสต์ของ ${postOwner}: "${text}"]`);
 
     input.value = "";
 };
 
-// 6. เพิ่มคอมเมนต์ลงใน UI
-window.addCommentToUI = function(postId, name, text) {
+// เพิ่มคอมเมนต์ลงใน UI (ใช้ตอนโหลดประวัติและตอนพิมพ์ใหม่)
+window.addCommentToUI_NoSave = function(postId, name, text) {
     const commentsArea = document.getElementById(`comments-${postId}`);
     if (!commentsArea) return;
 
@@ -1481,6 +1581,12 @@ window.addCommentToUI = function(postId, name, text) {
     commentDiv.className = 'ig-comment-line';
     commentDiv.innerHTML = `<span class="ig-username">${name}</span> ${text}`;
     commentsArea.appendChild(commentDiv);
+};
+
+// ฟังก์ชันสำหรับ AI คอมเมนต์ (รับจาก Regex)
+window.addCommentToUI = function(postId, name, text) {
+    saveIGCommentToStorage(postId, { name: name, text: text });
+    addCommentToUI_NoSave(postId, name, text);
 };
 
 // เรียกใช้ฟังก์ชันนี้ตอนโหลด Extension เพื่อตั้งค่าสีและวอลเปเปอร์เริ่มต้น
@@ -1491,5 +1597,8 @@ jQuery(async () => {
     setupMessageHook();
     loadPhoneSettings();
     initImageDB();
-    setTimeout(() => updateLineChatList(), 1000);
+    setTimeout(() => {
+        updateLineChatList();
+        loadIGHistoryForCurrentChar();
+    }, 1000);
 });
