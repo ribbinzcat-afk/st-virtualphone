@@ -148,6 +148,45 @@ function createPhoneUI() {
                     </div>
                 </div>
             `;
+        } else if (app.id === 'phone') {
+            // --- โครงสร้างแอป PHONE ---
+            appWindow.innerHTML = `
+                <!-- หน้า 1: สายเรียกเข้า (Incoming Call) -->
+                <div id="phone-incoming-view">
+                    <div class="phone-large-avatar" id="incoming-avatar"></div>
+                    <div class="phone-caller-name" id="incoming-name">Unknown</div>
+                    <div class="phone-status-text">Incoming Call...</div>
+                    <div class="phone-action-buttons">
+                        <div class="phone-btn phone-btn-decline" onclick="declineCall()">📴</div>
+                        <div class="phone-btn phone-btn-accept" onclick="acceptCall()">📞</div>
+                    </div>
+                </div>
+
+                <!-- หน้า 2: กำลังคุยสาย (Active Call) -->
+                <div id="phone-active-view">
+                    <div class="active-call-header">
+                        <div class="active-call-avatar" id="active-avatar"></div>
+                        <div style="font-weight: bold; font-size: 18px;" id="active-name">Name</div>
+                        <div class="active-call-timer" id="active-timer">00:00</div>
+                    </div>
+                    <div id="phone-transcript">
+                        <!-- คำพูดจะมาแสดงตรงนี้ -->
+                        <div style="text-align: center; color: #888; font-size: 12px; margin-top: 10px;">Call connected.</div>
+                    </div>
+
+                    <!-- ช่องพิมพ์ตอบกลับระหว่างคุยสาย -->
+                    <div style="display: flex; padding: 10px; background-color: #1c1c1e; border-top: 1px solid #333;">
+                        <input type="text" id="phone-input" placeholder="Speak..." style="flex: 1; border: none; border-radius: 15px; padding: 10px 15px; background-color: #2c2c2e; color: white; outline: none;">
+                        <div style="color: #007aff; padding: 10px; font-weight: bold; cursor: pointer;" onclick="sendPhoneMessage()">Send</div>
+                    </div>
+
+                    <div class="active-call-controls">
+                        <div class="call-control-btn">🔇</div>
+                        <div class="call-control-btn">📹</div>
+                        <div class="call-control-btn end-call" onclick="endCall()">📴</div>
+                    </div>
+                </div>
+            `;
         } else {
             // --- โครงสร้างแอปอื่นๆ (ยังเหมือนเดิม) ---
             appWindow.innerHTML = `
@@ -349,12 +388,28 @@ function handleNewMessage(messageId) {
         return `<span style="display:none;" class="hidden-line-msg">${match}</span>`;
     });
 
-    // 2. ดักจับแอป Phone (รูปแบบ: [Call|ชื่อคนโทร])
-    const callRegex = /\[Call\|(.*?)\]/gi;
+    // 2. ดักจับแอป Phone (สายเรียกเข้า) - รูปแบบ: [Call|ชื่อคนโทร] หรือ [Call: ชื่อคนโทร]
+    const callRegex = /\[Call[:|]\s*(.*?)\]/gi;
     text = text.replace(callRegex, (match, caller) => {
+        const callerName = caller.trim() || (getContext().name2 || "Unknown");
+
+        // เรียกฟังก์ชันให้โทรศัพท์เด้งขึ้นมา
+        setTimeout(() => triggerIncomingCall(callerName), 500); // หน่วงเวลาเล็กน้อยให้ดูสมจริง
+
         hasNotification = true;
-        triggerNotification('phone');
         return `<span style="display:none;">${match}</span>`;
+    });
+
+    // 3. ดักจับคำพูดระหว่างคุยสาย - รูปแบบ: [Phone: ข้อความ] หรือ [Phone|ชื่อ|ข้อความ]
+    const phoneMsgRegex = /\[Phone(?:\|(.*?))?[:|]\s*(.*?)\]/gi;
+    text = text.replace(phoneMsgRegex, (match, sender, message) => {
+        if (isCallActive) {
+            // เอาข้อความไปโชว์เป็นซับไตเติ้ลในหน้าจอโทรศัพท์
+            addTranscriptMessage(message.trim(), false);
+            hasNotification = true;
+            return `<span style="display:none;">${match}</span>`;
+        }
+        return match; // ถ้าไม่ได้อยู่ในสาย ก็ปล่อยข้อความไว้ปกติ
     });
 
     // ถ้ามีการแก้ไขข้อความ ให้เขียนทับกลับไปที่หน้าจอแชทหลัก
@@ -696,6 +751,108 @@ document.addEventListener('click', (e) => {
         updateLineChatList(); // อัปเดตรายชื่อเผื่อมีข้อความใหม่
     }
 });
+
+// --- ระบบแอปโทรศัพท์ (Phone Logic) ---
+let currentCallerName = "";
+let isCallActive = false;
+let callTimerInterval;
+let callSeconds = 0;
+
+// เมื่อมีสายเข้า
+function triggerIncomingCall(callerName) {
+    currentCallerName = callerName;
+    const avatarUrl = getAvatarUrl(false, callerName);
+
+    // อัปเดต UI หน้าสายเรียกเข้า
+    document.getElementById('incoming-name').innerText = callerName;
+    document.getElementById('incoming-avatar').style.backgroundImage = `url('${avatarUrl}')`;
+
+    // สลับหน้าจอไปที่สายเรียกเข้า
+    document.getElementById('phone-incoming-view').style.display = 'flex';
+    document.getElementById('phone-active-view').style.display = 'none';
+
+    // เปิดแอปโทรศัพท์ขึ้นมาอัตโนมัติ (เด้งขึ้นมาเลยเพื่อให้รู้ว่ามีสายเข้า)
+    if (!isPhoneOpen) togglePhone();
+    openApp('phone', 'Phone');
+}
+
+// กดรับสาย
+window.acceptCall = function() {
+    isCallActive = true;
+    const avatarUrl = getAvatarUrl(false, currentCallerName);
+
+    // อัปเดต UI หน้าคุยสาย
+    document.getElementById('active-name').innerText = currentCallerName;
+    document.getElementById('active-avatar').style.backgroundImage = `url('${avatarUrl}')`;
+    document.getElementById('phone-transcript').innerHTML = '<div style="text-align: center; color: #888; font-size: 12px; margin-top: 10px;">Call connected.</div>';
+
+    // สลับหน้าจอ
+    document.getElementById('phone-incoming-view').style.display = 'none';
+    document.getElementById('phone-active-view').style.display = 'flex';
+
+    // เริ่มจับเวลา
+    callSeconds = 0;
+    callTimerInterval = setInterval(() => {
+        callSeconds++;
+        const mins = String(Math.floor(callSeconds / 60)).padStart(2, '0');
+        const secs = String(callSeconds % 60).padStart(2, '0');
+        document.getElementById('active-timer').innerText = `${mins}:${secs}`;
+    }, 1000);
+
+    // ส่ง Prompt เบื้องหลังบอก AI ว่าเรารับสายแล้ว
+    sendHiddenPrompt(`[System: ผู้ใช้กดรับสายโทรศัพท์จาก ${currentCallerName} แล้ว กรุณาเริ่มพูดคุยผ่านโทรศัพท์]`);
+};
+
+// กดตัดสาย
+window.declineCall = function() {
+    // ปิดแอป
+    document.getElementById('window-phone').style.display = 'none';
+
+    // ส่ง Prompt บอก AI ว่าเราตัดสาย
+    sendHiddenPrompt(`[System: ผู้ใช้กดตัดสายโทรศัพท์จาก ${currentCallerName}]`);
+};
+
+// กดวางสาย (เมื่อคุยเสร็จ)
+window.endCall = function() {
+    isCallActive = false;
+    clearInterval(callTimerInterval);
+    document.getElementById('window-phone').style.display = 'none';
+    sendHiddenPrompt(`[System: ผู้ใช้วางสายโทรศัพท์แล้ว]`);
+};
+
+// พิมพ์ตอบกลับระหว่างคุยสาย
+window.sendPhoneMessage = function() {
+    const input = document.getElementById('phone-input');
+    const text = input.value.trim();
+    if (text && isCallActive) {
+        // โชว์ในหน้าจอโทรศัพท์
+        addTranscriptMessage(text, true);
+        // ส่งหา AI
+        sendHiddenPrompt(`[Phone: ${text}]`);
+        input.value = "";
+    }
+};
+
+// เพิ่มซับไตเติ้ลคำพูดในหน้าจอโทรศัพท์
+function addTranscriptMessage(message, isMe) {
+    const transcript = document.getElementById('phone-transcript');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `transcript-msg ${isMe ? 'transcript-me' : 'transcript-other'}`;
+    msgDiv.innerText = message;
+    transcript.appendChild(msgDiv);
+    transcript.scrollTop = transcript.scrollHeight;
+}
+
+// ฟังก์ชันตัวช่วยสำหรับส่งข้อความเบื้องหลัง
+function sendHiddenPrompt(promptText) {
+    const stTextarea = document.getElementById('send_textarea');
+    const stSendBtn = document.getElementById('send_but');
+    if (stTextarea && stSendBtn) {
+        stTextarea.value = promptText;
+        stTextarea.dispatchEvent(new Event('input', { bubbles: true }));
+        stSendBtn.click();
+    }
+}
 
 jQuery(async () => {
     console.log("📱 ST Virtual Phone Phase 2 Loaded!");

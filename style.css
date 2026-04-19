@@ -353,7 +353,7 @@
     border-radius: 20px;
     font-size: 14px;
     outline: none;
-    min-width: 0;
+    min-width: 0; /* ป้องกันไม่ให้ input ขยายเกินไป */
 }
 
 .line-send-btn {
@@ -362,4 +362,167 @@
     cursor: pointer;
     font-size: 14px;
     display: none; /* ซ่อนไว้จนกว่าจะพิมพ์ */
+}
+
+/* =========================================
+   PHONE / FACETIME APP UI
+========================================= */
+
+/* พื้นหลังแอปโทรศัพท์ (สีดำเข้มแบบโหมดโทร) */
+#window-phone {
+    background-color: #1c1c1e;
+    color: white;
+}
+
+/* --- หน้าจอสายเรียกเข้า (Incoming Call) --- */
+#phone-incoming-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    padding: 20px;
+    text-align: center;
+}
+
+.phone-large-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background-color: #333;
+    background-size: cover;
+    background-position: center;
+    margin-bottom: 20px;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+    animation: pulse-avatar 1.5s infinite;
+}
+
+@keyframes pulse-avatar {
+    0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3); }
+    70% { transform: scale(1); box-shadow: 0 0 0 20px rgba(255, 255, 255, 0); }
+    100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0); }
+}
+
+.phone-caller-name {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.phone-status-text {
+    font-size: 16px;
+    color: #8e8e93;
+    margin-bottom: 50px;
+}
+
+.phone-action-buttons {
+    display: flex;
+    gap: 40px;
+    margin-top: auto;
+    margin-bottom: 40px;
+}
+
+.phone-btn {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 30px;
+    cursor: pointer;
+    color: white;
+    border: none;
+    transition: transform 0.2s;
+}
+
+.phone-btn:active { transform: scale(0.9); }
+.phone-btn-decline { background-color: #ff3b30; }
+.phone-btn-accept { background-color: #34c759; }
+
+/* --- หน้าจอคุยสาย (Active Call) --- */
+#phone-active-view {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+    background-color: #1c1c1e;
+}
+
+.active-call-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px 0;
+    border-bottom: 1px solid #333;
+}
+
+.active-call-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    margin-bottom: 10px;
+}
+
+.active-call-timer {
+    font-size: 14px;
+    color: #34c759;
+}
+
+/* พื้นที่แสดงคำพูด (ซับไตเติ้ล) */
+#phone-transcript {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.transcript-msg {
+    padding: 10px 15px;
+    border-radius: 10px;
+    font-size: 15px;
+    line-height: 1.5;
+    max-width: 90%;
+}
+
+.transcript-other {
+    background-color: #2c2c2e;
+    align-self: flex-start;
+    color: white;
+}
+
+.transcript-me {
+    background-color: #007aff;
+    align-self: flex-end;
+    color: white;
+}
+
+/* แถบควบคุมตอนคุยสาย */
+.active-call-controls {
+    display: flex;
+    justify-content: space-around;
+    padding: 20px;
+    background-color: #2c2c2e;
+    border-top-left-radius: 20px;
+    border-top-right-radius: 20px;
+}
+
+.call-control-btn {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: #3a3a3c;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 20px;
+    cursor: pointer;
+    color: white;
+}
+
+.call-control-btn.end-call {
+    background-color: #ff3b30;
 }
