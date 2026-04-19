@@ -95,6 +95,7 @@ const apps = [
     { id: 'line', name: 'Line', icon: '💬', color: '#06C755' },
     { id: 'phone', name: 'Phone', icon: '📞', color: '#34C759' },
     { id: 'music', name: 'Music', icon: '🎵', color: '#FF2D55' },
+    { id: 'ig', name: 'Instagram', icon: '📸', color: '#E1306C' },
     { id: 'settings', name: 'Settings', icon: '⚙️', color: '#8E8E93' }
 ];
 
@@ -298,6 +299,18 @@ function createPhoneUI() {
                         </div>
                     </div>
 
+                </div>
+            `;
+        } else if (app.id === 'ig') {
+            // --- โครงสร้างแอป INSTAGRAM ---
+            appWindow.innerHTML = `
+                <div class="st-app-header">
+                    <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
+                    <div style="font-weight: bold;">Instagram</div>
+                    <div class="line-header-icons">➕</div>
+                </div>
+                <div class="st-app-content" id="content-ig">
+                    <div style="text-align: center; padding: 20px; color: #888;">No posts yet.</div>
                 </div>
             `;
         } else {
@@ -556,6 +569,20 @@ function handleNewMessage(messageId) {
 
         hasNotification = true;
         return `<span style="display:none;" class="hidden-music-msg">${match}</span>`;
+    });
+
+    // 5. ดักจับ Instagram - รูปแบบ: [IG|source|keyword|caption]
+    // ตัวอย่าง: [IG|web|cat|แมวน่ารักจัง] หรือ [IG|local|selfie1|ชุดใหม่]
+    const igRegex = /\[IG\|(web|local)\|(.*?)\|(.*?)\]/gi;
+    text = text.replace(igRegex, (match, source, keyword, caption) => {
+
+        // สั่งสร้างโพสต์ IG
+        createIGPost(source.trim().toLowerCase(), keyword.trim(), caption.trim());
+
+        hasNotification = true;
+        triggerNotification('ig'); // แจ้งเตือนแอป IG
+
+        return `<span style="display:none;" class="hidden-ig-msg">${match}</span>`;
     });
 
     // ถ้ามีการแก้ไขข้อความ ให้เขียนทับกลับไปที่หน้าจอแชทหลัก
@@ -1235,6 +1262,82 @@ function fetchAndRenderSticker(keyword) {
         });
     };
 }
+
+// --- ระบบแอป Instagram ---
+
+window.createIGPost = function(source, keyword, caption) {
+    const contentIG = document.getElementById('content-ig');
+    if (!contentIG) return;
+
+    // ลบข้อความ "No posts yet" ออกถ้ามี
+    if (contentIG.innerHTML.includes("No posts yet.")) {
+        contentIG.innerHTML = '';
+    }
+
+    const context = getContext();
+    const sender = context.name2 || "Unknown";
+    const avatarUrl = getAvatarUrl(false, sender);
+    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // สร้าง Element ของโพสต์
+    const postDiv = document.createElement('div');
+    postDiv.className = 'ig-post';
+
+    // โครงสร้างเริ่มต้น (ยังไม่มีรูป)
+    postDiv.innerHTML = `
+        <div class="ig-post-header">
+            <div class="ig-avatar" style="background-image: url('${avatarUrl}');"></div>
+            <div class="ig-username">${sender}</div>
+        </div>
+        <div class="ig-image-container" id="ig-img-container-${Date.now()}">
+            <div style="color: #888; font-size: 12px;">Loading image...</div>
+        </div>
+        <div class="ig-actions">
+            <div class="ig-action-icon" onclick="this.classList.toggle('liked'); this.innerText = this.classList.contains('liked') ? '❤️' : '🤍'">🤍</div>
+            <div class="ig-action-icon">💬</div>
+            <div class="ig-action-icon">✈️</div>
+        </div>
+        <div class="ig-caption-area">
+            <span class="ig-username">${sender}</span> ${caption}
+            <div class="ig-time">${timeString}</div>
+        </div>
+    `;
+
+    // แทรกโพสต์ใหม่ไว้บนสุด
+    contentIG.insertBefore(postDiv, contentIG.firstChild);
+
+    // จัดการรูปภาพตาม Source (web หรือ local)
+    const imgContainer = postDiv.querySelector('.ig-image-container');
+
+    if (source === 'web') {
+        // ใช้เว็บสุ่มรูปฟรี (LoremFlickr) โดยใช้ keyword
+        const cleanKeyword = keyword.replace(/\s+/g, ','); // เปลี่ยนช่องว่างเป็นลูกน้ำ
+        const randomNum = Math.floor(Math.random() * 1000); // ป้องกันภาพซ้ำแคช
+        const imageUrl = `https://loremflickr.com/400/400/${cleanKeyword}?random=${randomNum}`;
+
+        imgContainer.innerHTML = `<img src="${imageUrl}" class="ig-image" onerror="this.src='https://via.placeholder.com/400?text=Image+Not+Found'">`;
+    }
+    else if (source === 'local') {
+        // ดึงรูปจาก IndexedDB
+        if (imageDB) {
+            const cleanKeyword = keyword.trim().toLowerCase();
+            const transaction = imageDB.transaction([STORE_NAME], "readonly");
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.get(`ig_${cleanKeyword}`);
+
+            request.onsuccess = function(event) {
+                const result = event.target.result;
+                if (result && result.data) {
+                    imgContainer.innerHTML = `<img src="${result.data}" class="ig-image">`;
+                } else {
+                    imgContainer.innerHTML = `<div style="color: red; padding: 20px;">[Local Image Not Found: ${keyword}]</div>`;
+                }
+            };
+        } else {
+            imgContainer.innerHTML = `<div style="color: red; padding: 20px;">[Database Not Ready]</div>`;
+        }
+    }
+};
 
 // เรียกใช้ฟังก์ชันนี้ตอนโหลด Extension เพื่อตั้งค่าสีและวอลเปเปอร์เริ่มต้น
 jQuery(async () => {

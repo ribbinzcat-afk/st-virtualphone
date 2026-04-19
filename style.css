@@ -691,3 +691,91 @@
     object-fit: cover;
     background-color: #eee;
 }
+
+/* =========================================
+   INSTAGRAM APP UI
+========================================= */
+#window-ig {
+    background-color: #fafafa;
+    color: #262626;
+}
+
+#window-ig .st-app-header {
+    background-color: #fff;
+    border-bottom: 1px solid #dbdbdb;
+    font-family: 'Comic Sans MS', cursive, sans-serif; /* ฟอนต์ให้ดูคล้ายโลโก้ IG */
+    font-size: 18px;
+}
+
+#content-ig {
+    padding: 0;
+    background-color: #fff;
+}
+
+/* โครงสร้างโพสต์ IG */
+.ig-post {
+    border-bottom: 1px solid #dbdbdb;
+    padding-bottom: 15px;
+    margin-bottom: 10px;
+}
+
+.ig-post-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+}
+
+.ig-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background-size: cover;
+    background-position: center;
+    margin-right: 10px;
+    border: 1px solid #dbdbdb;
+}
+
+.ig-username {
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.ig-image-container {
+    width: 100%;
+    background-color: #efefef;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+}
+
+.ig-image {
+    width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: cover;
+}
+
+.ig-actions {
+    padding: 10px 15px;
+    display: flex;
+    gap: 15px;
+    font-size: 22px;
+}
+
+.ig-action-icon { cursor: pointer; }
+.ig-action-icon:hover { color: #888; }
+.ig-action-icon.liked { color: #ed4956; }
+
+.ig-caption-area {
+    padding: 0 15px;
+    font-size: 14px;
+}
+
+.ig-time {
+    font-size: 10px;
+    color: #8e8e8e;
+    text-transform: uppercase;
+    margin-top: 5px;
+}
