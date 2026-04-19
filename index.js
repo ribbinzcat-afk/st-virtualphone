@@ -270,7 +270,17 @@ function createPhoneUI() {
                     <div class="settings-section">
                         <h4>🖼️ Image Library (Sticker/IG)</h4>
 
-                        <!-- ช่องเลือกประเภทและตั้งชื่อ Keyword -->
+                        <!-- 1. เลือกไฟล์ -->
+                        <div class="settings-row">
+                            <input type="file" id="image-file-input" accept="image/*" style="width: 100%; font-size: 12px;" onchange="previewImageFile()">
+                        </div>
+
+                        <!-- 2. พื้นที่แสดงรูปพรีวิว (จะโชว์เมื่อเลือกไฟล์) -->
+                        <div id="image-preview-container" style="display: none; text-align: center; margin-bottom: 15px;">
+                            <img id="image-preview-img" src="" style="max-width: 100px; max-height: 100px; border-radius: 8px; border: 1px solid #ddd; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                        </div>
+
+                        <!-- 3. เลือกประเภทและตั้งชื่อ -->
                         <div class="settings-row">
                             <select id="image-upload-type" class="settings-input" style="width: 40%;">
                                 <option value="sticker">Sticker</option>
@@ -279,11 +289,8 @@ function createPhoneUI() {
                             <input type="text" id="image-keyword" placeholder="Keyword (e.g. cat_cry)" class="settings-input" style="width: 55%;">
                         </div>
 
-                        <!-- ปุ่มอัปโหลดไฟล์สำหรับ Sticker/IG -->
-                        <div class="settings-row">
-                            <input type="file" id="image-file-input" accept="image/*" style="width: 70%; font-size: 12px;">
-                            <button class="settings-btn" onclick="uploadImageToDB()" style="background-color: #28a745;">Save</button>
-                        </div>
+                        <!-- 4. ปุ่มกดเซฟ -->
+                        <button class="settings-btn" style="width: 100%; background-color: #28a745; margin-bottom: 10px;" onclick="uploadImageToDB()">Save to Database</button>
 
                         <!-- ลิสต์แสดงรูปภาพที่บันทึกไว้ -->
                         <div id="sticker-list-container">
@@ -1094,45 +1101,79 @@ window.uploadWallpaperFile = function() {
 
 // --- ฟังก์ชันจัดการรูปภาพ (Settings UI) ---
 
-// อัปโหลดรูปลงฐานข้อมูล
-window.uploadImageToDB = function() {
-    const type = document.getElementById('image-upload-type').value; // 'sticker' หรือ 'ig'
-    const keyword = document.getElementById('image-keyword').value.trim();
+// ตัวแปรเก็บรูปภาพชั่วคราวก่อนกดเซฟ
+let tempImageBase64 = "";
+
+// ฟังก์ชัน 1: พรีวิวรูปภาพเมื่อผู้ใช้กดเลือกไฟล์
+window.previewImageFile = function() {
     const fileInput = document.getElementById('image-file-input');
     const file = fileInput.files[0];
+    const previewContainer = document.getElementById('image-preview-container');
+    const previewImg = document.getElementById('image-preview-img');
 
-    if (!keyword || !file) {
-        alert("กรุณากรอก Keyword และเลือกไฟล์รูปภาพครับ");
+    if (!file) {
+        previewContainer.style.display = 'none';
+        tempImageBase64 = "";
         return;
     }
 
-    // ป้องกันการเว้นวรรคใน Keyword
-    const safeKeyword = keyword.replace(/\s+/g, '_').toLowerCase();
-    const id = `${type}_${safeKeyword}`;
+    // ตรวจสอบขนาดไฟล์ (จำกัด 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+        alert("ไฟล์ใหญ่เกินไปครับ กรุณาใช้รูปภาพขนาดไม่เกิน 2MB");
+        fileInput.value = "";
+        return;
+    }
 
     const reader = new FileReader();
     reader.onload = function(e) {
-        const base64 = e.target.result;
-
-        const transaction = imageDB.transaction([STORE_NAME], "readwrite");
-        const store = transaction.objectStore(STORE_NAME);
-
-        const imageData = {
-            id: id,
-            type: type,
-            keyword: safeKeyword,
-            data: base64
-        };
-
-        const request = store.put(imageData);
-        request.onsuccess = function() {
-            alert(`บันทึก ${type} [${safeKeyword}] สำเร็จ!`);
-            document.getElementById('image-keyword').value = "";
-            fileInput.value = "";
-            loadSavedImages(); // รีเฟรชรายการ
-        };
+        tempImageBase64 = e.target.result; // เก็บ Base64 ไว้ในตัวแปร
+        previewImg.src = tempImageBase64;  // แสดงรูปบนหน้าจอ
+        previewContainer.style.display = 'block';
     };
     reader.readAsDataURL(file);
+};
+
+// ฟังก์ชัน 2: บันทึกลงฐานข้อมูลเมื่อกดปุ่ม Save
+window.uploadImageToDB = function() {
+    const type = document.getElementById('image-upload-type').value;
+    const keyword = document.getElementById('image-keyword').value.trim();
+    const fileInput = document.getElementById('image-file-input');
+
+    if (!tempImageBase64) {
+        alert("กรุณาเลือกไฟล์รูปภาพก่อนครับ");
+        return;
+    }
+
+    if (!keyword) {
+        alert("กรุณากรอก Keyword ก่อนบันทึกครับ");
+        return;
+    }
+
+    const safeKeyword = keyword.replace(/\s+/g, '_').toLowerCase();
+    const id = `${type}_${safeKeyword}`;
+
+    const transaction = imageDB.transaction([STORE_NAME], "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+
+    const imageData = {
+        id: id,
+        type: type,
+        keyword: safeKeyword,
+        data: tempImageBase64
+    };
+
+    const request = store.put(imageData);
+    request.onsuccess = function() {
+        alert(`บันทึก ${type} [${safeKeyword}] สำเร็จ!`);
+
+        // ล้างค่าทั้งหมดหลังเซฟเสร็จ เพื่อเตรียมรับรูปใหม่
+        document.getElementById('image-keyword').value = "";
+        fileInput.value = "";
+        document.getElementById('image-preview-container').style.display = 'none';
+        tempImageBase64 = "";
+
+        loadSavedImages(); // รีเฟรชลิสต์ด้านล่าง
+    };
 };
 
 // โหลดรูปภาพทั้งหมดมาแสดงใน Settings
