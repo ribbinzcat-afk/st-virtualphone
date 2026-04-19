@@ -57,8 +57,8 @@ function saveLineMessage(senderName, message, isMe, timeString) {
 
 let isPhoneOpen = false;
 let isFabVisible = true;
-// ตัวแปรสำหรับเช็คว่ากำลังลากปุ่มอยู่หรือไม่ (ป้องกันการคลิกเปิดโทรศัพท์ตอนลาก)
 let isDragging = false;
+let currentActiveLineChat = "";
 
 // เก็บข้อมูลแอป
 const apps = [
@@ -112,44 +112,38 @@ function createPhoneUI() {
         appWindow.className = 'st-app-window';
 
         if (app.id === 'line') {
-            // --- โครงสร้างแอป LINE ---
+            // --- โครงสร้างแอป LINE (อัปเดตมีหน้ารวมแชท) ---
             appWindow.innerHTML = `
-                <div class="st-app-header">
-                    <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
-                    <div id="line-chat-title">Rex (เร็กซ์)</div>
-                    <div class="line-header-icons">📞 ≡</div>
-                </div>
-                <div class="st-app-content" id="content-${app.id}">
-                    <!-- ตัวอย่างข้อความฝั่งคนอื่น -->
-                    <div class="line-msg-wrapper other-message">
-                        <div class="line-avatar" style="background-image: url('https://i.pravatar.cc/100?img=11');"></div>
-                        <div class="line-msg-content">
-                            <div class="line-sender-name">Rex</div>
-                            <div style="display: flex;">
-                                <div class="line-bubble">ตื่นหรือยัง? วันนี้มีภารกิจนะ</div>
-                                <div class="line-time">08:30</div>
-                            </div>
-                        </div>
+                <!-- หน้า 1: หน้ารวมแชท (Chat List) -->
+                <div id="line-chat-list-view" style="display: flex; flex-direction: column; height: 100%;">
+                    <div class="st-app-header">
+                        <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
+                        <div>Chats</div>
+                        <div class="line-header-icons">⚙️</div>
                     </div>
+                    <div class="st-app-content" id="line-chat-list-content" style="padding: 0; background-color: #fff;">
+                        <!-- รายชื่อแชทจะถูกสร้างที่นี่ -->
+                    </div>
+                </div>
 
-                    <!-- ตัวอย่างข้อความฝั่งเรา -->
-                    <div class="line-msg-wrapper my-message">
-                        <div class="line-msg-content">
-                            <div style="display: flex; flex-direction: row-reverse;">
-                                <div class="line-bubble">ตื่นแล้วๆ กำลังเตรียมตัวอยู่!</div>
-                                <div class="line-time">08:32</div>
-                            </div>
-                        </div>
+                <!-- หน้า 2: หน้าห้องแชทส่วนตัว (Chat Room) -->
+                <div id="line-chat-room-view" style="display: none; flex-direction: column; height: 100%;">
+                    <div class="st-app-header">
+                        <div class="st-back-btn" id="btn-back-to-chatlist">❮</div>
+                        <div id="line-chat-title">Name</div>
+                        <div class="line-header-icons">📞 ≡</div>
                     </div>
-                </div>
-                <!-- แถบพิมพ์ข้อความ -->
-                <div class="line-input-area">
-                    <div class="line-icon-btn">＋</div>
-                    <div class="line-icon-btn">📷</div>
-                    <div class="line-icon-btn">😊</div>
-                    <input type="text" class="line-input-field" id="line-input" placeholder="Aa">
-                    <div class="line-icon-btn" id="line-mic-icon">🎤</div>
-                    <div class="line-send-btn" id="line-send-btn">Send</div>
+                    <div class="st-app-content" id="content-line">
+                        <!-- บับเบิลแชทจะมาโผล่ที่นี่ -->
+                    </div>
+                    <div class="line-input-area">
+                        <div class="line-icon-btn">＋</div>
+                        <div class="line-icon-btn">📷</div>
+                        <div class="line-icon-btn">😊</div>
+                        <input type="text" class="line-input-field" id="line-input" placeholder="Aa">
+                        <div class="line-icon-btn" id="line-mic-icon">🎤</div>
+                        <div class="line-send-btn" id="line-send-btn">Send</div>
+                    </div>
                 </div>
             `;
         } else {
@@ -321,22 +315,35 @@ function handleNewMessage(messageId) {
     let text = msgElement.innerHTML;
     let hasNotification = false;
 
-    // 1. ดักจับแอป Line (รูปแบบ: [Line|ชื่อคนส่ง|ข้อความ] หรือ [Line: ข้อความ])
-    // รองรับทั้งแบบระบุชื่อ และไม่ระบุชื่อ (ใช้ชื่อบอทปัจจุบันแทน)
-    const lineRegex = /\[Line(?:\|(.*?))?\|?(.*?)\]/gi;
+    // Regex ใหม่: ดักจับ [Line: ข้อความ] หรือ [Line|ชื่อ|ข้อความ]
+    const lineRegex = /\[Line[:|]\s*(.*?)\]/gi;
 
-    text = text.replace(lineRegex, (match, sender, message) => {
+    text = text.replace(lineRegex, (match, content) => {
         const context = getContext();
-        const actualSender = sender ? sender.trim() : (context.name2 || "Unknown");
-        const actualMessage = message ? message.trim() : "";
+        let sender = context.name2 || "Unknown";
+        let message = content.trim();
 
-        // เอาข้อความไปใส่ในแอป Line
-        addMessageToLineUI(actualSender, actualMessage, false);
+        // เช็คว่ามีการระบุชื่อไหม (เช่น เร็กซ์|ตื่นหรือยัง)
+        if (content.includes('|')) {
+            const parts = content.split('|');
+            sender = parts[0].trim();
+            message = parts[1].trim();
+        }
+
+        // เซฟข้อความลงประวัติของคนๆ นั้น
+        saveLineMessage(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+
+        // ถ้าเปิดหน้าต่างแชทของคนนี้อยู่ ให้แสดงข้อความทันที
+        if (currentActiveLineChat === sender) {
+            renderMessageToUI(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+        }
+
+        // อัปเดตหน้ารวมแชท
+        updateLineChatList();
 
         hasNotification = true;
         triggerNotification('line');
 
-        // ซ่อนข้อความนี้จากหน้าต่างแชทหลัก
         return `<span style="display:none;" class="hidden-line-msg">${match}</span>`;
     });
 
