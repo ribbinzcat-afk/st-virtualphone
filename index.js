@@ -36,22 +36,24 @@ function loadLineHistoryForCurrentChar() {
 function saveLineMessage(senderName, message, isMe, timeString) {
     const context = getContext();
     const charId = context.characterId;
-    if (!charId) return; // ถ้าไม่ได้อยู่ในแชทก็ไม่เซฟ
+    if (!charId) return;
 
     const allHistory = getAllLineHistory();
     if (!allHistory[charId]) {
         allHistory[charId] = [];
     }
 
-    // เพิ่มข้อความใหม่เข้าไป
+    // กำหนดว่าข้อความนี้อยู่ในห้องแชทของใคร
+    const chatRoom = isMe ? currentActiveLineChat : senderName;
+
     allHistory[charId].push({
         senderName: senderName,
         message: message,
         isMe: isMe,
-        time: timeString
+        time: timeString,
+        chatRoom: chatRoom
     });
 
-    // บันทึกกลับลง Storage
     localStorage.setItem(STORAGE_KEY, JSON.stringify(allHistory));
 }
 
@@ -200,7 +202,7 @@ function createPhoneUI() {
 
                 // 2. ส่งข้อความเบื้องหลังไปให้ AI ในหน้าต่างแชทหลักของ ST
                 // เราจะใส่ฟอร์แมต [Line: ข้อความ] เพื่อให้ AI รู้ว่าเราตอบผ่านแอป
-                const hiddenPrompt = `[Line ไปหา ${charName}: ${text}]`;
+                const hiddenPrompt = `[Line ไปหา ${currentActiveLineChat}: ${text}]`;
 
                 // นำข้อความไปใส่ในกล่องพิมพ์ของ ST และกดส่งอัตโนมัติ
                 const stTextarea = document.getElementById('send_textarea');
@@ -605,6 +607,95 @@ function makeDraggable(element) {
         }
     });
 }
+
+// อัปเดตหน้ารายชื่อแชท
+function updateLineChatList() {
+    const chatListContent = document.getElementById('line-chat-list-content');
+    if (!chatListContent) return;
+
+    const context = getContext();
+    const charId = context.characterId;
+    if (!charId) return;
+
+    const allHistory = getAllLineHistory();
+    const charHistory = allHistory[charId] || {}; // ประวัติของบอทตัวนี้
+
+    chatListContent.innerHTML = '';
+
+    // จัดกลุ่มข้อความตามชื่อคนส่ง (senderName)
+    const chatRooms = {};
+
+    // ดึงชื่อบอทหลักมาสร้างห้องไว้รอเลย (เผื่อยังไม่เคยคุย)
+    const mainCharName = context.name2 || "Character";
+    chatRooms[mainCharName] = { lastMsg: "Tap to chat", time: "" };
+
+    // จัดกลุ่มประวัติแชทที่มีอยู่
+    if (Array.isArray(charHistory)) {
+        charHistory.forEach(msg => {
+            const roomName = msg.isMe ? msg.chatRoom : msg.senderName;
+            if (roomName) {
+                chatRooms[roomName] = { lastMsg: msg.message, time: msg.time };
+            }
+        });
+    }
+
+    // สร้าง UI สำหรับแต่ละห้องแชท
+    Object.keys(chatRooms).forEach(roomName => {
+        const roomData = chatRooms[roomName];
+        const avatarUrl = getAvatarUrl(false, roomName); // ดึงรูป (ถ้าเป็น NPC จะได้รูป default)
+
+        const roomDiv = document.createElement('div');
+        roomDiv.style.cssText = "display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #f1f1f1; cursor: pointer;";
+        roomDiv.innerHTML = `
+            <div class="line-avatar" style="background-image: url('${avatarUrl}'); width: 50px; height: 50px; margin-right: 15px;"></div>
+            <div style="flex: 1; overflow: hidden;">
+                <div style="font-weight: bold; font-size: 16px; color: #333;">${roomName}</div>
+                <div style="color: #888; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${roomData.lastMsg}</div>
+            </div>
+            <div style="color: #aaa; font-size: 11px;">${roomData.time}</div>
+        `;
+
+        // เมื่อกดที่รายชื่อ ให้เปิดห้องแชทนั้น
+        roomDiv.addEventListener('click', () => {
+            openLineChatRoom(roomName);
+        });
+
+        chatListContent.appendChild(roomDiv);
+    });
+}
+
+// เปิดหน้าห้องแชท
+function openLineChatRoom(roomName) {
+    currentActiveLineChat = roomName;
+    document.getElementById('line-chat-list-view').style.display = 'none';
+    document.getElementById('line-chat-room-view').style.display = 'flex';
+    document.getElementById('line-chat-title').innerText = roomName;
+
+    // โหลดประวัติแชทเฉพาะของคนนี้
+    const contentLine = document.getElementById('content-line');
+    contentLine.innerHTML = '';
+
+    const context = getContext();
+    const allHistory = getAllLineHistory();
+    const charHistory = allHistory[context.characterId] || [];
+
+    charHistory.forEach(msg => {
+        const targetRoom = msg.isMe ? msg.chatRoom : msg.senderName;
+        if (targetRoom === roomName) {
+            renderMessageToUI(msg.senderName, msg.message, msg.isMe, msg.time);
+        }
+    });
+}
+
+// ผูก Event ให้ปุ่ม Back ในหน้าแชท
+document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'btn-back-to-chatlist') {
+        currentActiveLineChat = "";
+        document.getElementById('line-chat-room-view').style.display = 'none';
+        document.getElementById('line-chat-list-view').style.display = 'flex';
+        updateLineChatList(); // อัปเดตรายชื่อเผื่อมีข้อความใหม่
+    }
+});
 
 jQuery(async () => {
     console.log("📱 ST Virtual Phone Phase 2 Loaded!");
