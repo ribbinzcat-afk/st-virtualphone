@@ -601,23 +601,126 @@ function renderMessageToUI(senderName, message, isMe, timeString) {
 }
 
 // --- ระบบ Regex Hook ดักจับข้อความจาก AI (อัปเดตใหม่) ---
+// --- ระบบ Regex Hook ดักจับข้อความจาก AI (แก้บั๊กเปลี่ยนแชทแล้วไม่ทำงาน) ---
 function setupMessageHook() {
-    eventSource.on(event_types.MESSAGE_RECEIVED, handleNewMessage);
+    // ใช้ setInterval เพื่อดักจับข้อความแบบ Global (ทำงานทุกแชทแน่นอน 100%)
+    setInterval(() => {
+        // ค้นหาข้อความทั้งหมดในหน้าจอที่ยังไม่ได้ถูกประมวลผล (ยังไม่มีคลาส st-processed)
+        const newMessages = document.querySelectorAll('.mes_text:not(.st-processed)');
 
-    // อัปเดตชื่อแชท Line และโหลดประวัติแชทเมื่อเปลี่ยนตัวละคร
-    eventSource.on(event_types.CHAT_CHANGED, () => {
-        const titleElement = document.getElementById('line-chat-title');
-        if (titleElement) {
-            titleElement.innerText = getContext().name2 || "Chat";
-        }
+        newMessages.forEach(msgElement => {
+            let text = msgElement.innerHTML;
+            let originalText = text;
+            let hasNotification = false;
 
-        // โหลดประวัติแชทของตัวละครนี้ขึ้นมาแสดง
+            // 1. Line
+            text = text.replace(/\[Line[:|]\s*(.*?)(?:\|(.*?))?\]/gi, (match, p1, p2) => {
+                const sender = p2 ? p1.trim() : (getContext().name2 || "Unknown");
+                const message = p2 ? p2.trim() : p1.trim();
+                saveLineMessage(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                if (currentActiveLineChat === sender) {
+                    renderMessageToUI(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                }
+                updateLineChatList();
+                hasNotification = true; triggerNotification('line');
+                return `<span style="display:none;">${match}</span>`;
+            });
+
+            // 1.5 Sticker
+            text = text.replace(/\[Sticker[:|]\s*(.*?)\]/gi, (match, keyword) => {
+                const cleanKeyword = keyword.trim().toLowerCase();
+                const sender = getContext().name2 || "Unknown";
+                const stickerHtml = `<div class="st-async-sticker" data-keyword="${cleanKeyword}" style="width: 120px; height: 120px; background-color: #eee; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #888;">Loading...</div>`;
+                addMessageToLineUI(sender, stickerHtml, false);
+                fetchAndRenderSticker(cleanKeyword);
+                hasNotification = true; triggerNotification('line');
+                return `<span style="display:none;">${match}</span>`;
+            });
+
+            // 2. Phone (Call)
+            text = text.replace(/\[Call[:|]\s*(.*?)\]/gi, (match, caller) => {
+                const callerName = caller.trim() || (getContext().name2 || "Unknown");
+                setTimeout(() => triggerIncomingCall(callerName), 500);
+                hasNotification = true;
+                return `<span style="display:none;">${match}</span>`;
+            });
+
+            // 3. Phone (Active)
+            text = text.replace(/\[Phone(?:\|(.*?))?[:|]\s*(.*?)\]/gi, (match, sender, message) => {
+                if (isCallActive) {
+                    addTranscriptMessage(message.trim(), false);
+                    hasNotification = true;
+                    return `<span style="display:none;">${match}</span>`;
+                }
+                return match;
+            });
+
+            // 4. Music
+            text = text.replace(/\[Music[:|]\s*(https?:\/\/[^\s\]]+)\]/gi, (match, url) => {
+                playMusicTrack(url.trim());
+                hasNotification = true; triggerNotification('music');
+                return `<span style="display:none;">${match}</span>`;
+            });
+
+            // 5. IG Post
+            text = text.replace(/\[IG\|post\|(web|local)\|(.*?)\|(.*?)\]/gi, (match, source, keyword, caption) => {
+                const sender = getContext().name2 || "Unknown";
+                if (source.trim().toLowerCase() === 'web') {
+                    const cleanKeyword = keyword.replace(/\s+/g, ',');
+                    const randomNum = Math.floor(Math.random() * 1000);
+                    renderIGPostUI(sender, `https://loremflickr.com/400/400/${cleanKeyword}?random=${randomNum}`, caption.trim(), 'web', keyword.trim());
+                } else {
+                    renderIGPostUI(sender, '', caption.trim(), 'local', keyword.trim());
+                }
+                hasNotification = true; triggerNotification('ig');
+                return `<span style="display:none;">${match}</span>`;
+            });
+
+            // 5.5 IG Comment
+            text = text.replace(/\[IG\|comment\|(?:(.*?)\|)?(.*?)\]/gi, (match, nameOpt, commentText) => {
+                const sender = nameOpt ? nameOpt.trim() : (getContext().name2 || "Unknown");
+                if (latestPostId) {
+                    saveIGCommentToStorage(latestPostId, { name: sender, text: commentText.trim() });
+                    addCommentToUI_NoSave(latestPostId, sender, commentText.trim());
+                    hasNotification = true; triggerNotification('ig');
+                }
+                return `<span style="display:none;">${match}</span>`;
+            });
+
+            // 6. Twitter Post
+            text = text.replace(/\[Twitter\|post\|(.*?)\]/gi, (match, twText) => {
+                const sender = getContext().name2 || "Unknown";
+                renderTwitterPostUI(sender, twText.trim());
+                hasNotification = true; triggerNotification('twitter');
+                return `<span style="display:none;">${match}</span>`;
+            });
+
+            // 6.5 Twitter Reply
+            text = text.replace(/\[Twitter\|reply\|(.*?)\]/gi, (match, replyText) => {
+                const sender = getContext().name2 || "Unknown";
+                if (latestTweetId) {
+                    saveTwitterReply(latestTweetId, { name: sender, text: replyText.trim() });
+                    addTwitterReplyToUI_NoSave(latestTweetId, sender, replyText.trim());
+                    hasNotification = true; triggerNotification('twitter');
+                }
+                return `<span style="display:none;">${match}</span>`;
+            });
+
+            // ถ้ามีการเปลี่ยนแปลง ให้เขียนทับและติดแท็กว่าประมวลผลแล้ว
+            if (text !== originalText) {
+                msgElement.innerHTML = text;
+            }
+            // ติดแท็กว่าข้อความนี้ถูกเช็คแล้ว จะได้ไม่เช็คซ้ำให้เครื่องหน่วง
+            msgElement.classList.add('st-processed');
+        });
+    }, 1000); // เช็คทุกๆ 1 วินาที
+    
+    // โหลดประวัติแชทของตัวละครนี้ขึ้นมาแสดง
         loadLineHistoryForCurrentChar();
         updateLineChatList();
         loadIGHistoryForCurrentChar(); 
-    });
-
 }
+
 
 function handleNewMessage(messageId) {
     const msgElement = document.querySelector(`.mes[mesid="${messageId}"] .mes_text`);
