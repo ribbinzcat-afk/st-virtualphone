@@ -100,47 +100,47 @@ const apps = [
 ];
 
 function createPhoneUI() {
-    // 1. สร้าง Floating Button
-    const fab = document.createElement('div');
-    fab.id = 'st-phone-fab';
-    fab.innerHTML = `📱<div id="st-phone-badge"></div>`;
-    document.body.appendChild(fab);
+    try {
+        // 1. สร้าง Floating Button
+        const fab = document.createElement('div');
+        fab.id = 'st-phone-fab';
+        fab.innerHTML = `📱<div id="st-phone-badge" style="display:none;"></div>`;
+        document.body.appendChild(fab);
 
-    // เรียกใช้ฟังก์ชันทำให้ปุ่มลากได้
-    makeDraggable(fab);
-    
-    // 2. สร้างกรอบโทรศัพท์
-    const phoneContainer = document.createElement('div');
-    phoneContainer.id = 'st-phone-container';
+        // ทำให้ปุ่มลากได้
+        makeDraggable(fab);
 
-    // สร้างหน้าจอหลัก (Screen)
-    const screen = document.createElement('div');
-    screen.id = 'st-phone-screen';
+        // 2. สร้างกรอบโทรศัพท์
+        const phoneContainer = document.createElement('div');
+        phoneContainer.id = 'st-phone-container';
 
-    // สร้าง Home Screen
-    const homeScreen = document.createElement('div');
-    homeScreen.id = 'st-phone-home';
+        const screen = document.createElement('div');
+        screen.id = 'st-phone-screen';
 
-    // สร้างไอคอนแอปใส่ใน Home Screen
-    apps.forEach(app => {
-        const appIcon = document.createElement('div');
-        appIcon.className = 'st-app-icon';
-        appIcon.innerHTML = `
-            <div class="st-app-icon-img" style="color: ${app.color};">${app.icon}</div>
-            <div class="st-app-badge" id="badge-${app.id}">1</div>
-            <div class="st-app-icon-name">${app.name}</div>
-        `;
-        appIcon.addEventListener('click', () => openApp(app.id, app.name));
-        homeScreen.appendChild(appIcon);
-    });
+        const homeScreen = document.createElement('div');
+        homeScreen.id = 'st-phone-home';
 
-    screen.appendChild(homeScreen);
+        // 3. สร้างไอคอนแอปลงใน Home Screen
+        apps.forEach(app => {
+            const appIcon = document.createElement('div');
+            appIcon.className = 'st-app-icon';
+            appIcon.innerHTML = `
+                <div class="st-app-icon-img" style="color: ${app.color};">${app.icon}</div>
+                <div class="st-app-badge" id="badge-${app.id}">!</div>
+                <div class="st-app-icon-name">${app.name}</div>
+            `;
+            appIcon.addEventListener('click', () => openApp(app.id, app.name));
+            homeScreen.appendChild(appIcon);
+        });
 
-    // สร้างหน้าต่างสำหรับแต่ละแอป (ซ่อนไว้ก่อน)
-    apps.forEach(app => {
-        const appWindow = document.createElement('div');
-        appWindow.id = `window-${app.id}`;
-        appWindow.className = 'st-app-window';
+        screen.appendChild(homeScreen);
+
+        // 4. สร้างหน้าต่างแอปต่างๆ
+        apps.forEach(app => {
+            const appWindow = document.createElement('div');
+            appWindow.id = `window-${app.id}`;
+            appWindow.className = 'st-app-window';
+            appWindow.style.display = 'none'; // ซ่อนไว้ก่อน
 
         if (app.id === 'line') {
             // --- โครงสร้างแอป LINE (อัปเดตมีหน้ารวมแชท) ---
@@ -356,8 +356,16 @@ function createPhoneUI() {
         screen.appendChild(appWindow);
     });
 
-    phoneContainer.appendChild(screen);
-    document.body.appendChild(phoneContainer);
+        phoneContainer.appendChild(screen);
+
+        // 5. นำกรอบโทรศัพท์ทั้งหมดไปแปะลงบนหน้าจอ ST (บรรทัดนี้สำคัญมาก!)
+        document.body.appendChild(phoneContainer);
+
+        console.log("📱 Phone UI Created Successfully!");
+
+    } catch (error) {
+        console.error("❌ Error creating Phone UI:", error);
+    }
 
 // อัปเดต Event Click: เปิดโทรศัพท์ก็ต่อเมื่อ "ไม่ได้กำลังลาก"
 //   fab.addEventListener('click', (e) => {
