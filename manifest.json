@@ -1,11 +1,8 @@
 {
     "name": "Virtual Smartphone",
-     "display_name": "🥽 Virtual Phone",
     "description": "เพิ่มสมาร์ทโฟนจำลองสำหรับการ Roleplay แบบ Slice of Life",
     "version": "1.0.0",
     "author": "Lou & Assistant",
     "main": "index.js",
-    "assets": [
-        "style.css"
-    ]
+    "css": "style.css"
 }

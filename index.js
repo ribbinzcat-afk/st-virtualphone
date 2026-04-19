@@ -1,30 +1,84 @@
-import { extension_settings, getContext } from "../../../extensions.js";
+import { getContext } from "../../../extensions.js";
+// นำเข้า eventSource จากระบบหลักของ SillyTavern เพื่อดักจับข้อความ
+import { eventSource, event_types } from "../../../../script.js";
 
-// ตัวแปรเก็บสถานะ
 let isPhoneOpen = false;
 let isFabVisible = true;
 
-// 1. สร้าง HTML Elements (Floating Button & Phone Container)
+// เก็บข้อมูลแอป
+const apps = [
+    { id: 'line', name: 'Line', icon: '💬', color: '#06C755' },
+    { id: 'phone', name: 'Phone', icon: '📞', color: '#34C759' },
+    { id: 'music', name: 'Music', icon: '🎵', color: '#FF2D55' },
+    { id: 'settings', name: 'Settings', icon: '⚙️', color: '#8E8E93' }
+];
+
 function createPhoneUI() {
-    // สร้างปุ่ม Floating
+    // 1. สร้าง Floating Button
     const fab = document.createElement('div');
     fab.id = 'st-phone-fab';
     fab.innerHTML = `📱<div id="st-phone-badge"></div>`;
     document.body.appendChild(fab);
 
-    // สร้างกรอบโทรศัพท์
+    // 2. สร้างกรอบโทรศัพท์
     const phoneContainer = document.createElement('div');
     phoneContainer.id = 'st-phone-container';
-    phoneContainer.innerHTML = `<div id="st-phone-screen">
-        <h3 style="text-align: center; margin-top: 50%; color: black;">Home Screen<br>(รอใส่ไอคอนแอป)</h3>
-    </div>`;
+
+    // สร้างหน้าจอหลัก (Screen)
+    const screen = document.createElement('div');
+    screen.id = 'st-phone-screen';
+
+    // สร้าง Home Screen
+    const homeScreen = document.createElement('div');
+    homeScreen.id = 'st-phone-home';
+
+    // สร้างไอคอนแอปใส่ใน Home Screen
+    apps.forEach(app => {
+        const appIcon = document.createElement('div');
+        appIcon.className = 'st-app-icon';
+        appIcon.innerHTML = `
+            <div class="st-app-icon-img" style="color: ${app.color};">${app.icon}</div>
+            <div class="st-app-badge" id="badge-${app.id}">1</div>
+            <div class="st-app-icon-name">${app.name}</div>
+        `;
+        appIcon.addEventListener('click', () => openApp(app.id, app.name));
+        homeScreen.appendChild(appIcon);
+    });
+
+    screen.appendChild(homeScreen);
+
+    // สร้างหน้าต่างสำหรับแต่ละแอป (ซ่อนไว้ก่อน)
+    apps.forEach(app => {
+        const appWindow = document.createElement('div');
+        appWindow.id = `window-${app.id}`;
+        appWindow.className = 'st-app-window';
+        appWindow.innerHTML = `
+            <div class="st-app-header">
+                <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮ Back</div>
+                <div>${app.name}</div>
+            </div>
+            <div class="st-app-content" id="content-${app.id}">
+                <p>Welcome to ${app.name} App!</p>
+                <!-- เนื้อหาแอปจะมาใส่ตรงนี้ใน Phase ต่อไป -->
+            </div>
+        `;
+        screen.appendChild(appWindow);
+    });
+
+    phoneContainer.appendChild(screen);
     document.body.appendChild(phoneContainer);
 
-    // Event เปิด/ปิดโทรศัพท์เมื่อกดปุ่ม Floating
     fab.addEventListener('click', togglePhone);
 }
 
-// 2. ฟังก์ชันเปิด/ปิด โทรศัพท์
+// ฟังก์ชันเปิดแอป
+function openApp(appId, appName) {
+    // ซ่อนจุดแจ้งเตือนของแอปนั้น
+    document.getElementById(`badge-${appId}`).style.display = 'none';
+    // โชว์หน้าต่างแอป
+    document.getElementById(`window-${appId}`).style.display = 'flex';
+}
+
 function togglePhone() {
     const phone = document.getElementById('st-phone-container');
     const badge = document.getElementById('st-phone-badge');
@@ -34,94 +88,86 @@ function togglePhone() {
 
     if (isPhoneOpen) {
         phone.style.display = 'flex';
-        // เมื่อเปิดโทรศัพท์ ให้หยุดสั่นและซ่อนจุดแดง
         badge.style.display = 'none';
         fab.classList.remove('fab-vibrating');
     } else {
         phone.style.display = 'none';
-    }
-}
-
-// 3. ฟังก์ชันเปิด/ปิด ปุ่ม Floating (สำหรับปุ่มในเมนูตั้งค่า)
-function toggleFabVisibility() {
-    const fab = document.getElementById('st-phone-fab');
-    const phone = document.getElementById('st-phone-container');
-
-    isFabVisible = !isFabVisible;
-
-    if (isFabVisible) {
-        fab.style.display = 'flex';
-    } else {
-        fab.style.display = 'none';
-        // ถ้าซ่อนปุ่ม ก็ควรซ่อนโทรศัพท์ด้วย
-        if (isPhoneOpen) togglePhone();
-    }
-}
-
-// 4. สร้าง UI ในหน้า Extension Settings ของ SillyTavern
-function setupSettingsMenu() {
-    const settingsHtml = `
-        <div class="st-phone-settings-wrapper">
-            <h4>📱 Virtual Phone Settings</h4>
-            <button id="btn-toggle-phone" class="st-phone-settings-btn">Open/Close Phone</button>
-            <button id="btn-toggle-fab" class="st-phone-settings-btn">Show/Hide Floating Button</button>
-            <hr>
-            <button id="btn-test-notification" class="st-phone-settings-btn" style="background-color: #f59e0b;">Test Notification (สั่น)</button>
-        </div>
-    `;
-
-    // หาตำแหน่งที่จะใส่เมนู (SillyTavern มีแท็บ Extensions)
-    const extensionPanel = document.getElementById('extensions_settings');
-    if (extensionPanel) {
-        const container = document.createElement('div');
-        container.innerHTML = settingsHtml;
-        extensionPanel.appendChild(container);
-
-        // ผูก Event ให้ปุ่มใน Settings
-        document.getElementById('btn-toggle-phone').addEventListener('click', togglePhone);
-        document.getElementById('btn-toggle-fab').addEventListener('click', toggleFabVisibility);
-
-        // ปุ่มทดสอบการแจ้งเตือน
-        document.getElementById('btn-test-notification').addEventListener('click', () => {
-            triggerNotification();
+        // ปิดทุกแอปเมื่อปิดโทรศัพท์ ให้กลับไปหน้า Home
+        apps.forEach(app => {
+            document.getElementById(`window-${app.id}`).style.display = 'none';
         });
     }
 }
 
-// 5. ฟังก์ชันจำลองการแจ้งเตือน (จุดแดง + สั่น)
-function triggerNotification() {
+function triggerNotification(appId) {
     const fab = document.getElementById('st-phone-fab');
-    const badge = document.getElementById('st-phone-badge');
+    const mainBadge = document.getElementById('st-phone-badge');
+    const appBadge = document.getElementById(`badge-${appId}`);
 
     if (!isPhoneOpen) {
         fab.classList.add('fab-vibrating');
-        badge.style.display = 'block';
+        mainBadge.style.display = 'block';
+        setTimeout(() => fab.classList.remove('fab-vibrating'), 2000);
+    }
 
-        // ให้สั่น 2 วินาทีแล้วหยุด (แต่จุดแดงยังอยู่)
-        setTimeout(() => {
-            fab.classList.remove('fab-vibrating');
-        }, 2000);
+    // โชว์จุดแดงที่แอปด้วย
+    if (appBadge) {
+        appBadge.style.display = 'flex';
+        // เพิ่มตัวเลขแจ้งเตือน (แบบง่ายๆ)
+        appBadge.innerText = "!";
     }
 }
 
-// 6. โครงสร้าง Regex พื้นฐาน (เดี๋ยวเราจะมาเขียน Logic ดักข้อความกันใน Phase ต่อไป)
-function processMessageRegex(message) {
-    // ตัวอย่าง Regex ดักจับ [Line: ข้อความ]
-    const lineRegex = /\[Line:\s*(.*?)\]/gi;
-
-    // ตรวจสอบว่ามีข้อความตรงเงื่อนไขไหม (เดี๋ยวมาต่อเติม)
-    if (lineRegex.test(message)) {
-        triggerNotification();
-    }
-    return message;
+// --- ระบบ Regex Hook ดักจับข้อความจาก AI ---
+function setupMessageHook() {
+    // ดักจับเมื่อมีข้อความใหม่ถูกส่งเข้ามาหรือถูกแก้ไข
+    eventSource.on(event_types.MESSAGE_RECEIVED, handleNewMessage);
+    eventSource.on(event_types.MESSAGE_UPDATED, handleNewMessage);
 }
 
-// ฟังก์ชันเริ่มต้นทำงานเมื่อโหลด Extension
+function handleNewMessage(messageId) {
+    // ดึง Context ของแชทปัจจุบัน
+    const context = getContext();
+    const chat = context.chat;
+
+    // หาข้อความล่าสุดจาก messageId
+    const msgElement = document.querySelector(`.mes[mesid="${messageId}"] .mes_text`);
+    if (!msgElement) return;
+
+    let text = msgElement.innerHTML;
+    let hasNotification = false;
+
+    // 1. ดักจับแอป Line (รูปแบบ: [Line|ชื่อคนส่ง|ข้อความ])
+    const lineRegex = /\[Line\|(.*?)\|(.*?)\]/gi;
+    text = text.replace(lineRegex, (match, sender, message) => {
+        console.log(`📱 ได้รับข้อความ Line จาก ${sender}: ${message}`);
+
+        // TODO: ใน Phase หน้า เราจะเอาข้อมูลนี้ไปยัดใส่ UI ของแอป Line
+
+        hasNotification = true;
+        triggerNotification('line');
+
+        // Return ค่าว่าง เพื่อ "ซ่อน" ข้อความนี้จากหน้าแชทหลัก
+        return `<span style="display:none;">${match}</span>`;
+    });
+
+    // 2. ดักจับแอป Phone (รูปแบบ: [Call|ชื่อคนโทร])
+    const callRegex = /\[Call\|(.*?)\]/gi;
+    text = text.replace(callRegex, (match, caller) => {
+        console.log(`📞 มีสายเข้าจาก: ${caller}`);
+        hasNotification = true;
+        triggerNotification('phone');
+        return `<span style="display:none;">${match}</span>`;
+    });
+
+    // ถ้ามีการแก้ไขข้อความ ให้เขียนทับกลับไปที่หน้าจอแชท
+    if (hasNotification) {
+        msgElement.innerHTML = text;
+    }
+}
+
 jQuery(async () => {
-    console.log("📱 ST Virtual Phone Extension Loaded!");
-
+    console.log("📱 ST Virtual Phone Phase 2 Loaded!");
     createPhoneUI();
-    setupSettingsMenu();
-
-    // TODO: ใน Phase หน้า เราจะ Hook เข้ากับ Event ของ ST เพื่อดักจับข้อความตอน AI ตอบกลับ
+    setupMessageHook();
 });
