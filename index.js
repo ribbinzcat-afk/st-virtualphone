@@ -664,13 +664,18 @@ function openApp(appId, appName) {
     document.getElementById(`window-${appId}`).style.display = 'flex';
 }
 
-// ฟังก์ชันเปิด/ปิด โทรศัพท์
+// --- ฟังก์ชันเปิด/ปิด โทรศัพท์ (แบบชัวร์ 100%) ---
 window.togglePhone = function() {
+    console.log("📱 กำลังพยายามเปิด/ปิดโทรศัพท์... สถานะปัจจุบัน:", isPhoneOpen);
+
     const phone = document.getElementById('st-phone-container');
     const badge = document.getElementById('st-phone-badge');
     const fab = document.getElementById('st-phone-fab');
 
-    if (!phone) return; // ป้องกัน Error ถ้าหาหน้าจอไม่เจอ
+    if (!phone) {
+        console.error("❌ หาหน้าจอโทรศัพท์ไม่เจอ! (ID: st-phone-container)");
+        return;
+    }
 
     isPhoneOpen = !isPhoneOpen;
 
@@ -678,17 +683,13 @@ window.togglePhone = function() {
         phone.style.display = 'flex';
         if (badge) badge.style.display = 'none';
         if (fab) fab.classList.remove('fab-vibrating');
+        console.log("✅ โทรศัพท์เปิดแล้ว!");
     } else {
         phone.style.display = 'none';
-        // ปิดทุกแอปเมื่อปิดโทรศัพท์ ให้กลับไปหน้า Home
-        if (typeof apps !== 'undefined') {
-            apps.forEach(app => {
-                const appWin = document.getElementById(`window-${app.id}`);
-                if (appWin) appWin.style.display = 'none';
-            });
-        }
+        console.log("❌ โทรศัพท์ปิดแล้ว!");
     }
 };
+
 
 // 3. ฟังก์ชันเปิด/ปิด ปุ่ม Floating (สำหรับปุ่มในเมนูตั้งค่า)
 function toggleFabVisibility() {
@@ -798,20 +799,13 @@ function triggerNotification(appId) {
 }
 
 // --- ฟังก์ชันทำให้ปุ่มลากได้ (Draggable) ---
-// --- ฟังก์ชันทำให้ปุ่มลากได้ (แก้ปัญหาแตะบนมือถือไม่ติด) ---
+// --- ฟังก์ชันทำให้ปุ่มลากได้ (แก้บั๊กคลิกเบิ้ลบนมือถือ) ---
 function makeDraggable(element) {
-    let currentX = 0;
-    let currentY = 0;
-    let initialX;
-    let initialY;
-    let xOffset = 0;
-    let yOffset = 0;
+    let currentX = 0, currentY = 0, initialX, initialY, xOffset = 0, yOffset = 0;
     let active = false;
+    let isDragging = false;
 
-    // ตัวแปรเก็บตำแหน่งตอนเริ่มแตะ เพื่อคำนวณระยะทาง
-    let startClickX = 0;
-    let startClickY = 0;
-
+    // รองรับทั้ง Touch และ Mouse
     element.addEventListener("touchstart", dragStart, { passive: false });
     document.addEventListener("touchend", dragEnd, false);
     document.addEventListener("touchmove", drag, { passive: false });
@@ -824,49 +818,31 @@ function makeDraggable(element) {
         if (e.type === "touchstart") {
             initialX = e.touches[0].clientX - xOffset;
             initialY = e.touches[0].clientY - yOffset;
-            startClickX = e.touches[0].clientX;
-            startClickY = e.touches[0].clientY;
         } else {
             initialX = e.clientX - xOffset;
             initialY = e.clientY - yOffset;
-            startClickX = e.clientX;
-            startClickY = e.clientY;
         }
 
         if (e.target === element || element.contains(e.target)) {
             active = true;
-            isDragging = false; // รีเซ็ตสถานะ
+            isDragging = false; // เริ่มต้นถือว่ายังไม่ได้ลาก
         }
     }
 
     function dragEnd(e) {
         if (!active) return;
-
         initialX = currentX;
         initialY = currentY;
         active = false;
 
-        // คำนวณระยะทางที่นิ้วขยับไป
-        let endClickX = e.type === "touchend" ? e.changedTouches[0].clientX : e.clientX;
-        let endClickY = e.type === "touchend" ? e.changedTouches[0].clientY : e.clientY;
-
-        let moveDistance = Math.sqrt(Math.pow(endClickX - startClickX, 2) + Math.pow(endClickY - startClickY, 2));
-
-        // ถ้านิ้วขยับน้อยกว่า 10px ให้ถือว่าเป็นการ "คลิก/แตะ" ไม่ใช่การลาก
-        if (moveDistance < 10) {
-            isDragging = false;
-            // เรียกฟังก์ชันเปิด/ปิด โทรศัพท์โดยตรงเลย
-            togglePhone();
-        } else {
-            isDragging = true;
-        }
-
-        setTimeout(() => { isDragging = false; }, 50);
+        // หน่วงเวลาเพื่อไม่ให้ click event ทำงานถ้าเพิ่งลากเสร็จ
+        setTimeout(() => { isDragging = false; }, 100);
     }
 
     function drag(e) {
         if (active) {
-            e.preventDefault(); // ป้องกันหน้าจอเลื่อนตามนิ้ว
+            e.preventDefault(); // ป้องกันหน้าจอเลื่อน
+            isDragging = true;  // ถือว่ากำลังลากอยู่
 
             if (e.type === "touchmove") {
                 currentX = e.touches[0].clientX - initialX;
@@ -878,14 +854,23 @@ function makeDraggable(element) {
 
             xOffset = currentX;
             yOffset = currentY;
-
             element.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
         }
     }
 
+    // --- ใช้ Event Click มาตรฐานแทน เพื่อป้องกันบั๊ก Ghost Click ---
+    element.addEventListener('click', (e) => {
+        // ถ้ากำลังลากอยู่ จะไม่เปิดโทรศัพท์
+        if (isDragging) {
+            e.preventDefault();
+            return;
+        }
+        // ถ้าไม่ได้ลาก (แค่แตะ) ให้เปิดโทรศัพท์เลย
+        togglePhone();
+    });
+
     window.addEventListener('resize', () => {
-        xOffset = 0;
-        yOffset = 0;
+        xOffset = 0; yOffset = 0;
         element.style.transform = `translate3d(0px, 0px, 0)`;
     });
 }
