@@ -78,6 +78,33 @@
     transition: opacity 0.3s ease;
 }
 
+/* --- Phone Container (อัปเกรดให้อยู่บนสุดและตรงกลาง 100%) --- */
+#st-phone-container {
+    position: fixed;
+
+    /* เทคนิคจัดกึ่งกลางที่เสถียรที่สุดบนทุกเบราว์เซอร์ */
+    left: 0;
+    right: 0;
+    margin-left: auto;
+    margin-right: auto;
+    bottom: 90px;
+
+    width: 350px;
+    height: 700px;
+    max-height: 85vh;
+    background-color: #1e1e1e;
+    border: 10px solid #333;
+    border-radius: 30px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.8); /* เพิ่มเงาให้เข้มขึ้นจะได้เห็นชัดๆ */
+
+    /* ดัน z-index ให้สูงทะลุฟ้า จะได้ไม่โดน ST บัง */
+    z-index: 999999 !important;
+
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+}
+
 /* หน้าจอภายในโทรศัพท์ */
 #st-phone-screen {
     width: 100%;
@@ -89,14 +116,13 @@
 /* --- Responsive สำหรับมือถือ (max-width: 768px) --- */
 @media (max-width: 768px) {
     #st-phone-container {
-        width: 90vw;
-        /* จัดกึ่งกลางบนมือถือ: 50vw ลบด้วยครึ่งนึงของ 90vw (คือ 45vw) */
-        left: calc(50vw - 45vw);
-
-        height: 80vh;
-        bottom: 80px;
-        border-width: 5px;
-        border-radius: 20px;
+        width: 90vw !important;
+        max-width: 400px !important;
+        height: 80vh !important;
+        bottom: 50% !important; /* ดันขึ้นมาตรงกลางจอ */
+        transform: translateY(50%) !important; /* จัดให้อยู่ตรงกลางจอแนวตั้งพอดี */
+        border-width: 5px !important;
+        border-radius: 20px !important;
     }
 }
 
