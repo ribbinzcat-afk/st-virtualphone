@@ -861,7 +861,7 @@
 
 /* ปุ่ม Floating สำหรับสร้างทวีตใหม่ (ข้างในแอป) */
 .tw-fab-create {
-    position: absolute;
+    position: fixed;
     bottom: 20px; right: 20px;
     width: 55px; height: 55px;
     background-color: #1d9bf0;
