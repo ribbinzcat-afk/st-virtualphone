@@ -2,6 +2,59 @@ import { getContext } from "../../../extensions.js";
 // นำเข้า eventSource จากระบบหลักของ SillyTavern เพื่อดักจับข้อความ
 import { eventSource, event_types } from "../../../../script.js";
 
+// --- ระบบจัดการประวัติแชท (Local Storage) ---
+const STORAGE_KEY = 'st_virtualphone_line_history';
+
+// โหลดประวัติแชททั้งหมดจาก Storage
+function getAllLineHistory() {
+    const data = localStorage.getItem(STORAGE_KEY);
+    return data ? JSON.parse(data) : {};
+}
+
+// โหลดประวัติแชทของตัวละครปัจจุบัน
+function loadLineHistoryForCurrentChar() {
+    const context = getContext();
+    const charId = context.characterId;
+    if (!charId) return;
+
+    const allHistory = getAllLineHistory();
+    const charHistory = allHistory[charId] || [];
+
+    const contentLine = document.getElementById('content-line');
+    if (!contentLine) return;
+
+    // ล้างหน้าจอแชทเดิมก่อน
+    contentLine.innerHTML = '';
+
+    // นำประวัติมาแสดงบนหน้าจอทีละข้อความ (โดยไม่เซฟซ้ำ)
+    charHistory.forEach(msg => {
+        renderMessageToUI(msg.senderName, msg.message, msg.isMe, msg.time);
+    });
+}
+
+// บันทึกข้อความใหม่ลง Storage
+function saveLineMessage(senderName, message, isMe, timeString) {
+    const context = getContext();
+    const charId = context.characterId;
+    if (!charId) return; // ถ้าไม่ได้อยู่ในแชทก็ไม่เซฟ
+
+    const allHistory = getAllLineHistory();
+    if (!allHistory[charId]) {
+        allHistory[charId] = [];
+    }
+
+    // เพิ่มข้อความใหม่เข้าไป
+    allHistory[charId].push({
+        senderName: senderName,
+        message: message,
+        isMe: isMe,
+        time: timeString
+    });
+
+    // บันทึกกลับลง Storage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(allHistory));
+}
+
 let isPhoneOpen = false;
 let isFabVisible = true;
 // ตัวแปรสำหรับเช็คว่ากำลังลากปุ่มอยู่หรือไม่ (ป้องกันการคลิกเปิดโทรศัพท์ตอนลาก)
@@ -200,17 +253,25 @@ function getAvatarUrl(isMe, charName) {
 
 // --- ฟังก์ชันเพิ่มข้อความลงใน UI ของ Line ---
 function addMessageToLineUI(senderName, message, isMe) {
+    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // 1. แสดงผลบนหน้าจอ
+    renderMessageToUI(senderName, message, isMe, timeString);
+
+    // 2. เซฟลงประวัติแชท
+    saveLineMessage(senderName, message, isMe, timeString);
+}
+
+// ฟังก์ชันสำหรับวาด UI บับเบิลแชท (ใช้ร่วมกันทั้งตอนรับข้อความใหม่และตอนโหลดประวัติ)
+function renderMessageToUI(senderName, message, isMe, timeString) {
     const contentLine = document.getElementById('content-line');
     if (!contentLine) return;
 
-    const timeString = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const avatarUrl = getAvatarUrl(isMe, senderName);
-
     const msgDiv = document.createElement('div');
     msgDiv.className = `line-msg-wrapper ${isMe ? 'my-message' : 'other-message'}`;
 
     if (isMe) {
-        // โครงสร้างฝั่งเรา (ไม่มีรูป Avatar)
         msgDiv.innerHTML = `
             <div class="line-msg-content">
                 <div style="display: flex; flex-direction: row-reverse;">
@@ -220,7 +281,6 @@ function addMessageToLineUI(senderName, message, isMe) {
             </div>
         `;
     } else {
-        // โครงสร้างฝั่งคนอื่น (มีรูป Avatar และชื่อ)
         msgDiv.innerHTML = `
             <div class="line-avatar" style="background-image: url('${avatarUrl}');"></div>
             <div class="line-msg-content">
@@ -234,26 +294,24 @@ function addMessageToLineUI(senderName, message, isMe) {
     }
 
     contentLine.appendChild(msgDiv);
-
-    // เลื่อนหน้าจอแชทลงมาล่างสุดอัตโนมัติ
     contentLine.scrollTop = contentLine.scrollHeight;
 }
 
 // --- ระบบ Regex Hook ดักจับข้อความจาก AI (อัปเดตใหม่) ---
 function setupMessageHook() {
     eventSource.on(event_types.MESSAGE_RECEIVED, handleNewMessage);
-    eventSource.on(event_types.MESSAGE_UPDATED, handleNewMessage);
 
-    // อัปเดตชื่อแชท Line ด้านบนเมื่อเปลี่ยนตัวละคร
+    // อัปเดตชื่อแชท Line และโหลดประวัติแชทเมื่อเปลี่ยนตัวละคร
     eventSource.on(event_types.CHAT_CHANGED, () => {
         const titleElement = document.getElementById('line-chat-title');
         if (titleElement) {
             titleElement.innerText = getContext().name2 || "Chat";
         }
-        // ล้างประวัติแชทบนหน้าจอเมื่อเปลี่ยนห้อง (เดี๋ยวทำระบบเซฟประวัติใน Phase ถัดไป)
-        const contentLine = document.getElementById('content-line');
-        if (contentLine) contentLine.innerHTML = '';
+
+        // โหลดประวัติแชทของตัวละครนี้ขึ้นมาแสดง
+        loadLineHistoryForCurrentChar();
     });
+
 }
 
 function handleNewMessage(messageId) {
@@ -322,6 +380,94 @@ function togglePhone() {
             document.getElementById(`window-${app.id}`).style.display = 'none';
         });
     }
+}
+
+// 3. ฟังก์ชันเปิด/ปิด ปุ่ม Floating (สำหรับปุ่มในเมนูตั้งค่า)
+function toggleFabVisibility() {
+    const fab = document.getElementById('st-phone-fab');
+    const phone = document.getElementById('st-phone-container');
+
+    isFabVisible = !isFabVisible;
+
+    if (isFabVisible) {
+        fab.style.display = 'flex';
+    } else {
+        fab.style.display = 'none';
+        // ถ้าซ่อนปุ่ม ก็ควรซ่อนโทรศัพท์ด้วย
+        if (isPhoneOpen) togglePhone();
+    }
+}
+
+// 4. สร้าง UI ในหน้า Extension Settings ของ SillyTavern
+function setupSettingsMenu() {
+    const settingsHtml = `
+        <div class="st-phone-settings-wrapper">
+            <h4>📱 Virtual Phone Settings</h4>
+            <button id="btn-toggle-phone" class="st-phone-settings-btn">Open/Close Phone</button>
+            <button id="btn-toggle-fab" class="st-phone-settings-btn">Show/Hide Floating Button</button>
+            <hr>
+            <h4>💬 Line Backup</h4>
+            <button id="btn-export-line" class="st-phone-settings-btn" style="background-color: #007bff;">Export Line History</button>
+            <button id="btn-import-line" class="st-phone-settings-btn" style="background-color: #17a2b8;">Import Line History</button>
+            <input type="file" id="file-import-line" style="display: none;" accept=".json">
+            <hr>
+            <button id="btn-test-notification" class="st-phone-settings-btn" style="background-color: #f59e0b;">Test Notification</button>
+        </div>
+    `;
+
+    // หาตำแหน่งที่จะใส่เมนู (SillyTavern มีแท็บ Extensions)
+    const extensionPanel = document.getElementById('extensions_settings');
+    if (extensionPanel) {
+        const container = document.createElement('div');
+        container.innerHTML = settingsHtml;
+        extensionPanel.appendChild(container);
+
+        // ผูก Event ให้ปุ่มใน Settings
+        document.getElementById('btn-toggle-phone').addEventListener('click', togglePhone);
+        document.getElementById('btn-toggle-fab').addEventListener('click', toggleFabVisibility);
+
+        // ปุ่มทดสอบการแจ้งเตือน
+        document.getElementById('btn-test-notification').addEventListener('click', () => {
+            triggerNotification();
+        });
+    }
+
+    // Event สำหรับ Export
+    document.getElementById('btn-export-line')?.addEventListener('click', () => {
+        const data = localStorage.getItem(STORAGE_KEY);
+        if (!data) return alert("ไม่มีประวัติแชทให้ Export ครับ");
+
+        const blob = new Blob([data], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `Line_History_Backup_${new Date().toISOString().slice(0,10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // Event สำหรับ Import
+    document.getElementById('btn-import-line')?.addEventListener('click', () => {
+        document.getElementById('file-import-line').click();
+    });
+
+    document.getElementById('file-import-line')?.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            try {
+                const importedData = JSON.parse(event.target.result);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(importedData));
+                alert("นำเข้าประวัติแชทสำเร็จ! กรุณารีเฟรชหน้าต่างแชท Line");
+                loadLineHistoryForCurrentChar(); // โหลดใหม่ทันที
+            } catch (err) {
+                alert("ไฟล์ไม่ถูกต้องครับ");
+            }
+        };
+        reader.readAsText(file);
+    });
 }
 
 function triggerNotification(appId) {
