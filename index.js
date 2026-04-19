@@ -187,6 +187,28 @@ function createPhoneUI() {
                     </div>
                 </div>
             `;
+        } else if (app.id === 'music') {
+            // --- โครงสร้างแอป MUSIC ---
+            appWindow.innerHTML = `
+                <div class="st-app-header">
+                    <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
+                    <div>Music Player</div>
+                    <div class="line-header-icons">⋮</div>
+                </div>
+                <div class="st-app-content music-player-container">
+                    <div class="music-disc" id="music-disc-anim">
+                        <div class="music-disc-center"></div>
+                    </div>
+
+                    <div class="music-status-text" id="music-now-playing">
+                        No track currently playing.<br>Waiting for a song link...
+                    </div>
+
+                    <div class="music-iframe-wrapper" id="music-player-frame">
+                        <div style="color: #666; font-size: 12px;">Player will appear here</div>
+                    </div>
+                </div>
+            `;
         } else {
             // --- โครงสร้างแอปอื่นๆ (ยังเหมือนเดิม) ---
             appWindow.innerHTML = `
@@ -410,6 +432,18 @@ function handleNewMessage(messageId) {
             return `<span style="display:none;">${match}</span>`;
         }
         return match; // ถ้าไม่ได้อยู่ในสาย ก็ปล่อยข้อความไว้ปกติ
+    });
+
+    // 4. ดักจับแอป Music - รูปแบบ: [Music: ลิงก์ยูทูป/สปอติฟาย] หรือ [Music|ลิงก์]
+    const musicRegex = /\[Music[:|]\s*(https?:\/\/[^\s\]]+)\]/gi;
+    text = text.replace(musicRegex, (match, url) => {
+        const cleanUrl = url.trim();
+
+        // สั่งให้แอป Music เล่นเพลงนี้
+        playMusicTrack(cleanUrl);
+
+        hasNotification = true;
+        return `<span style="display:none;" class="hidden-music-msg">${match}</span>`;
     });
 
     // ถ้ามีการแก้ไขข้อความ ให้เขียนทับกลับไปที่หน้าจอแชทหลัก
@@ -853,6 +887,38 @@ function sendHiddenPrompt(promptText) {
         stSendBtn.click();
     }
 }
+
+// --- ระบบแอป Music (Player Logic) ---
+window.playMusicTrack = function(url) {
+    const playerFrame = document.getElementById('music-player-frame');
+    const statusText = document.getElementById('music-now-playing');
+    const discAnim = document.getElementById('music-disc-anim');
+
+    if (!playerFrame) return;
+
+    let embedUrl = "";
+    let platform = "";
+
+    const ytMatch = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+    const spotifyMatch = url.match(/spotify\.com\/(track|playlist|album)\/([\w\d]+)/);
+
+    if (ytMatch && ytMatch[1]) {
+        embedUrl = `https://www.youtube.com/embed/${ytMatch[1]}?autoplay=0`; // แนะนำให้ปิด autoplay ก่อนเผื่อเบราว์เซอร์บล็อก
+        platform = "YouTube";
+    } else if (spotifyMatch && spotifyMatch[1] && spotifyMatch[2]) {
+        embedUrl = `https://open.spotify.com/embed/${spotifyMatch[1]}/${spotifyMatch[2]}?utm_source=generator`;
+        platform = "Spotify";
+    }
+
+    if (embedUrl) {
+        playerFrame.innerHTML = `<iframe src="${embedUrl}" width="100%" height="100%" frameborder="0" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
+        statusText.innerHTML = `🎵 Shared via <b>${platform}</b>`;
+        discAnim.classList.add('playing');
+        triggerNotification('music');
+    } else {
+        console.log("📱 Music App: ไม่รองรับลิงก์นี้ ->", url);
+    }
+};
 
 jQuery(async () => {
     console.log("📱 ST Virtual Phone Phase 2 Loaded!");

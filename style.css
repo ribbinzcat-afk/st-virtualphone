@@ -526,3 +526,81 @@
 .call-control-btn.end-call {
     background-color: #ff3b30;
 }
+
+/* =========================================
+   MUSIC APP UI
+========================================= */
+#window-music {
+    background: linear-gradient(180deg, #2c2c35 0%, #121216 100%);
+    color: white;
+}
+
+#window-music .st-app-header {
+    background-color: transparent;
+    color: white;
+    border-bottom: none;
+}
+
+#window-music .st-back-btn {
+    color: white;
+}
+
+.music-player-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    height: 100%;
+}
+
+/* แผ่นเสียงตกแต่ง */
+.music-disc {
+    width: 160px;
+    height: 160px;
+    border-radius: 50%;
+    background: conic-gradient(#333, #111, #333, #111, #333);
+    border: 5px solid #444;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    margin-top: 30px;
+    margin-bottom: 40px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* อนิเมชันหมุน (เริ่มต้นจะหยุดไว้ก่อน) */
+    animation: spin-disc 4s linear infinite;
+    animation-play-state: paused;
+}
+
+.music-disc.playing {
+    animation-play-state: running;
+}
+
+.music-disc-center {
+    width: 30px;
+    height: 30px;
+    background-color: #121216;
+    border-radius: 50%;
+    border: 2px solid #555;
+}
+
+@keyframes spin-disc { 100% { transform: rotate(360deg); } }
+
+/* กรอบสำหรับใส่ YouTube / Spotify Player */
+.music-iframe-wrapper {
+    width: 100%;
+    height: 152px; /* ความสูงพอดีกับ Spotify Player */
+    border-radius: 12px;
+    overflow: hidden;
+    background-color: #222;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.music-status-text {
+    margin-bottom: 20px;
+    color: #aaa;
+    font-size: 14px;
+    text-align: center;
+}
