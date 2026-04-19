@@ -1,28 +1,41 @@
-/* ปุ่ม Floating ลอยอยู่มุมขวาล่าง */
-#vp-floating-btn {
+/* --- Floating Button --- */
+#st-phone-fab {
     position: fixed;
     bottom: 20px;
     right: 20px;
     width: 60px;
     height: 60px;
-    background-color: #333;
+    background-color: #3b82f6;
     border-radius: 50%;
     box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     cursor: pointer;
-    z-index: 9999;
+    z-index: 9999; /* ให้อยู่บนสุด */
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 30px;
+    font-size: 24px;
     transition: transform 0.2s;
 }
 
-#vp-floating-btn:hover {
+#st-phone-fab:hover {
     transform: scale(1.1);
 }
 
-/* จุดแจ้งเตือนสีแดง (Badge) */
-.vp-badge {
+/* อนิเมชันสั่นเวลามีแจ้งเตือน */
+@keyframes phone-vibrate {
+    0% { transform: rotate(0deg); }
+    25% { transform: rotate(10deg); }
+    50% { transform: rotate(0deg); }
+    75% { transform: rotate(-10deg); }
+    100% { transform: rotate(0deg); }
+}
+
+.fab-vibrating {
+    animation: phone-vibrate 0.3s infinite;
+}
+
+/* จุดแดงแจ้งเตือน */
+#st-phone-badge {
     position: absolute;
     top: 5px;
     right: 5px;
@@ -30,45 +43,58 @@
     height: 15px;
     background-color: red;
     border-radius: 50%;
-    display: none; /* ซ่อนไว้ก่อน จะโชว์ตอนมีแจ้งเตือน */
+    display: none; /* ซ่อนไว้ก่อน */
 }
 
-/* อนิเมชันสั่นเวลามีแจ้งเตือน */
-@keyframes vp-vibrate {
-    0% { transform: translate(0); }
-    20% { transform: translate(-2px, 2px); }
-    40% { transform: translate(-2px, -2px); }
-    60% { transform: translate(2px, 2px); }
-    80% { transform: translate(2px, -2px); }
-    100% { transform: translate(0); }
-}
-.vp-vibrating {
-    animation: vp-vibrate 0.3s ease-in-out infinite;
-}
-
-/* กรอบโทรศัพท์มือถือ */
-#vp-phone-container {
+/* --- Phone Container --- */
+#st-phone-container {
     position: fixed;
-    bottom: 90px;
+    bottom: 90px; /* ลอยอยู่เหนือปุ่ม Floating */
     right: 20px;
-    width: 320px;
-    height: 600px;
-    background-color: #000; /* สีกรอบโทรศัพท์ เปลี่ยนได้ทีหลัง */
-    border-radius: 40px;
-    border: 8px solid #222;
+    width: 350px;
+    height: 700px;
+    max-height: 85vh; /* ป้องกันทะลุขอบจอบน */
+    background-color: #1e1e1e;
+    border: 10px solid #333;
+    border-radius: 30px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5);
     z-index: 9998;
-    display: none; /* ซ่อนไว้ก่อน รอผู้ใช้กดปุ่ม */
-    overflow: hidden;
+    display: none; /* ซ่อนไว้ก่อน */
     flex-direction: column;
+    overflow: hidden;
 }
 
-/* หน้าจอโทรศัพท์ (Wallpaper จะมาใส่ตรงนี้) */
-#vp-phone-screen {
+/* หน้าจอภายในโทรศัพท์ */
+#st-phone-screen {
     width: 100%;
     height: 100%;
-    background-color: #f0f0f0;
-    background-size: cover;
-    background-position: center;
+    background-color: #ffffff; /* สีพื้นหลังเริ่มต้น (เปลี่ยนเป็นรูปได้ทีหลัง) */
     position: relative;
+}
+
+/* --- Responsive สำหรับมือถือ (max-width: 768px) --- */
+@media (max-width: 768px) {
+    #st-phone-container {
+        width: 90vw; /* ขยายให้เกือบเต็มจอมือถือซ้ายขวา */
+        right: 5vw;
+        bottom: 80px;
+        height: 80vh; /* ป้องกันการทับกับ UI บนของมือถือ */
+        border-width: 5px;
+        border-radius: 20px;
+    }
+}
+
+/* ปุ่มใน Extension Settings */
+.st-phone-settings-btn {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+.st-phone-settings-btn:hover {
+    background-color: #45a049;
 }
