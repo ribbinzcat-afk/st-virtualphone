@@ -177,11 +177,26 @@ function createPhoneUI() {
                     </div>
                 </div>
             `;
-        } else if (app.id === 'phone') {
-            // --- โครงสร้างแอป PHONE ---
+                } else if (app.id === 'phone') {
             appWindow.innerHTML = `
-                <!-- หน้า 1: สายเรียกเข้า (Incoming Call) -->
-                <div id="phone-incoming-view">
+                <!-- หน้า 1: ประวัติการโทร (Call History) -->
+                <div id="phone-history-view">
+                    <div class="st-app-header" style="background-color: #1c1c1e; border-bottom: 1px solid #333;">
+                        <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
+                        <div>Phone</div>
+                        <div style="width: 20px;"></div>
+                    </div>
+                    <div class="st-app-content" style="padding: 0;">
+                        <div class="call-btn-large" onclick="initiateCallOut()">📞 Call Current Character</div>
+                        <div style="padding: 15px; color: #888; font-size: 14px;">Recent Calls</div>
+                        <div id="call-history-list">
+                            <!-- ประวัติการโทรจะมาโชว์ตรงนี้ -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- หน้า 2: สายเรียกเข้า (Incoming Call) เหมือนเดิม -->
+                <div id="phone-incoming-view" style="display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center;">
                     <div class="phone-large-avatar" id="incoming-avatar"></div>
                     <div class="phone-caller-name" id="incoming-name">Unknown</div>
                     <div class="phone-status-text">Incoming Call...</div>
@@ -191,28 +206,23 @@ function createPhoneUI() {
                     </div>
                 </div>
 
-                <!-- หน้า 2: กำลังคุยสาย (Active Call) -->
+                <!-- หน้า 3: กำลังคุยสาย (Active Call) อัปเกรด UI -->
                 <div id="phone-active-view">
-                    <div class="active-call-header">
-                        <div class="active-call-avatar" id="active-avatar"></div>
-                        <div style="font-weight: bold; font-size: 18px;" id="active-name">Name</div>
-                        <div class="active-call-timer" id="active-timer">00:00</div>
-                    </div>
-                    <div id="phone-transcript">
-                        <!-- คำพูดจะมาแสดงตรงนี้ -->
-                        <div style="text-align: center; color: #888; font-size: 12px; margin-top: 10px;">Call connected.</div>
-                    </div>
-
-                    <!-- ช่องพิมพ์ตอบกลับระหว่างคุยสาย -->
-                    <div style="display: flex; padding: 10px; background-color: #1c1c1e; border-top: 1px solid #333;">
-                        <input type="text" id="phone-input" placeholder="Speak..." style="flex: 1; border: none; border-radius: 15px; padding: 10px 15px; background-color: #2c2c2e; color: white; outline: none;">
-                        <div style="color: #007aff; padding: 10px; font-weight: bold; cursor: pointer;" onclick="sendPhoneMessage()">Send</div>
-                    </div>
-
-                    <div class="active-call-controls">
-                        <div class="call-control-btn">🔇</div>
-                        <div class="call-control-btn">📹</div>
-                        <div class="call-control-btn end-call" onclick="endCall()">📴</div>
+                    <div class="active-call-overlay"></div>
+                    <div class="active-call-content">
+                        <div class="active-call-header">
+                            <div class="active-call-avatar" id="active-avatar"></div>
+                            <div style="font-weight: bold; font-size: 22px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);" id="active-name">Name</div>
+                            <div class="active-call-timer" id="active-timer">Calling...</div>
+                        </div>
+                        <div id="phone-transcript"></div>
+                        <div style="display: flex; padding: 10px; background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);">
+                            <input type="text" id="phone-input" placeholder="Speak..." style="flex: 1; border: none; border-radius: 20px; padding: 10px 15px; background-color: #2c2c2e; color: white; outline: none;">
+                            <div style="color: #007aff; padding: 10px; font-weight: bold; cursor: pointer;" onclick="sendPhoneMessage()">Send</div>
+                        </div>
+                        <div class="active-call-controls" style="background: rgba(0,0,0,0.8);">
+                            <div class="call-control-btn end-call" onclick="endCall()">📴</div>
+                        </div>
                     </div>
                 </div>
             `;
@@ -470,6 +480,7 @@ function setupMessageHook() {
 
         // โหลดประวัติแชทของตัวละครนี้ขึ้นมาแสดง
         loadLineHistoryForCurrentChar();
+        updateLineChatList();
     });
 
 }
@@ -949,21 +960,43 @@ function triggerIncomingCall(callerName) {
     openApp('phone', 'Phone');
 }
 
-// กดรับสาย
+window.initiateCallOut = function() {
+    const context = getContext();
+    const charName = context.name2 || "Character";
+    currentCallerName = charName;
+    const avatarUrl = getAvatarUrl(false, charName);
+
+    // เซ็ตภาพพื้นหลังเต็มจอ และรูปกลม
+    const activeView = document.getElementById('phone-active-view');
+    activeView.style.backgroundImage = `url('${avatarUrl}')`;
+    document.getElementById('active-avatar').style.backgroundImage = `url('${avatarUrl}')`;
+    document.getElementById('active-name').innerText = charName;
+    document.getElementById('phone-transcript').innerHTML = '<div style="text-align: center; color: #ccc; font-size: 12px; margin-top: 10px;">Ringing...</div>';
+    document.getElementById('active-timer').innerText = "Calling...";
+
+    // สลับหน้าจอ
+    document.getElementById('phone-history-view').style.display = 'none';
+    activeView.style.display = 'flex';
+
+    // ส่ง Prompt โทรออกหาบอท
+    sendHiddenPrompt(`[System: ผู้ใช้กดโทรศัพท์หา ${charName} (กำลังรอสาย...)]`);
+    isCallActive = true; // เปิดสถานะสาย
+};
+
+// แก้ไขฟังก์ชัน acceptCall (ตอนเรารับสาย) ให้เซ็ตภาพพื้นหลังด้วย
 window.acceptCall = function() {
     isCallActive = true;
     const avatarUrl = getAvatarUrl(false, currentCallerName);
 
-    // อัปเดต UI หน้าคุยสาย
+    const activeView = document.getElementById('phone-active-view');
+    activeView.style.backgroundImage = `url('${avatarUrl}')`; // พื้นหลังเต็มจอ
     document.getElementById('active-name').innerText = currentCallerName;
     document.getElementById('active-avatar').style.backgroundImage = `url('${avatarUrl}')`;
-    document.getElementById('phone-transcript').innerHTML = '<div style="text-align: center; color: #888; font-size: 12px; margin-top: 10px;">Call connected.</div>';
+    document.getElementById('phone-transcript').innerHTML = '<div style="text-align: center; color: #ccc; font-size: 12px; margin-top: 10px;">Call connected.</div>';
 
-    // สลับหน้าจอ
     document.getElementById('phone-incoming-view').style.display = 'none';
-    document.getElementById('phone-active-view').style.display = 'flex';
+    activeView.style.display = 'flex';
 
-    // เริ่มจับเวลา
     callSeconds = 0;
     callTimerInterval = setInterval(() => {
         callSeconds++;
@@ -972,8 +1005,15 @@ window.acceptCall = function() {
         document.getElementById('active-timer').innerText = `${mins}:${secs}`;
     }, 1000);
 
-    // ส่ง Prompt เบื้องหลังบอก AI ว่าเรารับสายแล้ว
-    sendHiddenPrompt(`[System: ผู้ใช้กดรับสายโทรศัพท์จาก ${currentCallerName} แล้ว กรุณาเริ่มพูดคุยผ่านโทรศัพท์]`);
+    sendHiddenPrompt(`[System: ผู้ใช้กดรับสายโทรศัพท์จาก ${currentCallerName} แล้ว]`);
+};
+
+window.endCall = function() {
+    isCallActive = false;
+    clearInterval(callTimerInterval);
+    document.getElementById('phone-active-view').style.display = 'none';
+    document.getElementById('phone-history-view').style.display = 'flex'; // กลับมาหน้าประวัติ
+    sendHiddenPrompt(`[System: ผู้ใช้วางสายโทรศัพท์แล้ว]`);
 };
 
 // กดตัดสาย
@@ -983,14 +1023,6 @@ window.declineCall = function() {
 
     // ส่ง Prompt บอก AI ว่าเราตัดสาย
     sendHiddenPrompt(`[System: ผู้ใช้กดตัดสายโทรศัพท์จาก ${currentCallerName}]`);
-};
-
-// กดวางสาย (เมื่อคุยเสร็จ)
-window.endCall = function() {
-    isCallActive = false;
-    clearInterval(callTimerInterval);
-    document.getElementById('window-phone').style.display = 'none';
-    sendHiddenPrompt(`[System: ผู้ใช้วางสายโทรศัพท์แล้ว]`);
 };
 
 // พิมพ์ตอบกลับระหว่างคุยสาย
@@ -1345,6 +1377,7 @@ jQuery(async () => {
     createPhoneUI();
     setupSettingsMenu();
     setupMessageHook();
-    loadPhoneSettings(); // <--- เพิ่มบรรทัดนี้
-    initImageDB(); // เดี๋ยวเราจะเขียนฟังก์ชันนี้ในขั้นตอนถัดไป
+    loadPhoneSettings();
+    initImageDB();
+    setTimeout(() => updateLineChatList(), 1000);
 });
