@@ -604,3 +604,90 @@
     font-size: 14px;
     text-align: center;
 }
+
+/* =========================================
+   SETTINGS APP UI
+========================================= */
+#window-settings {
+    background-color: #f2f2f7; /* สีพื้นหลังแบบ iOS Settings */
+    color: #000;
+}
+
+.settings-container {
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.settings-section {
+    background-color: #fff;
+    border-radius: 12px;
+    padding: 15px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.settings-section h4 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 14px;
+    text-transform: uppercase;
+}
+
+.settings-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.settings-row:last-child {
+    margin-bottom: 0;
+}
+
+.settings-input {
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    width: 60%;
+    outline: none;
+}
+
+.settings-btn {
+    padding: 8px 12px;
+    background-color: #007aff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.settings-btn:hover { background-color: #0056b3; }
+.settings-btn-danger { background-color: #ff3b30; }
+
+/* รายการสติกเกอร์ที่เซฟไว้ */
+#sticker-list-container {
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 10px;
+    border-top: 1px solid #eee;
+    padding-top: 10px;
+}
+
+.saved-image-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid #f9f9f9;
+}
+
+.saved-image-preview {
+    width: 40px;
+    height: 40px;
+    border-radius: 5px;
+    object-fit: cover;
+    background-color: #eee;
+}

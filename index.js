@@ -209,6 +209,52 @@ function createPhoneUI() {
                     </div>
                 </div>
             `;
+                } else if (app.id === 'settings') {
+            // --- โครงสร้างแอป SETTINGS ---
+            appWindow.innerHTML = `
+                <div class="st-app-header" style="background-color: #f2f2f7;">
+                    <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
+                    <div>Settings</div>
+                    <div style="width: 20px;"></div> <!-- spacer -->
+                </div>
+                <div class="st-app-content settings-container">
+
+                    <!-- ส่วนที่ 1: ปรับแต่งโทรศัพท์ -->
+                    <div class="settings-section">
+                        <h4>🎨 Personalization</h4>
+                        <div class="settings-row">
+                            <span>Phone Color</span>
+                            <input type="color" id="setting-phone-color" value="#333333" class="settings-input" style="width: 50px; padding: 0;">
+                        </div>
+                        <div class="settings-row">
+                            <span>Wallpaper URL</span>
+                            <input type="text" id="setting-wallpaper-url" placeholder="Paste image link here" class="settings-input">
+                        </div>
+                        <button class="settings-btn" style="width: 100%;" onclick="applyPhoneSettings()">Apply Changes</button>
+                    </div>
+
+                    <!-- ส่วนที่ 2: จัดการรูปภาพ (Sticker / IG) -->
+                    <div class="settings-section">
+                        <h4>🖼️ Image Library (Sticker/IG)</h4>
+                        <div class="settings-row">
+                            <select id="image-upload-type" class="settings-input" style="width: 40%;">
+                                <option value="sticker">Sticker</option>
+                                <option value="ig">IG Local</option>
+                            </select>
+                            <input type="text" id="image-keyword" placeholder="Keyword (e.g. cat_cry)" class="settings-input" style="width: 55%;">
+                        </div>
+                        <div class="settings-row">
+                            <input type="file" id="image-file-input" accept="image/*" style="width: 70%; font-size: 12px;">
+                            <button class="settings-btn" onclick="uploadImageToDB()">Save</button>
+                        </div>
+
+                        <div id="sticker-list-container">
+                            <div style="text-align: center; color: #888; font-size: 12px;">Loading saved images...</div>
+                        </div>
+                    </div>
+
+                </div>
+            `;
         } else {
             // --- โครงสร้างแอปอื่นๆ (ยังเหมือนเดิม) ---
             appWindow.innerHTML = `
@@ -920,8 +966,46 @@ window.playMusicTrack = function(url) {
     }
 };
 
+// --- ระบบแอป Settings (Personalization) ---
+
+// โหลดการตั้งค่าเดิมเมื่อเปิดแอป
+function loadPhoneSettings() {
+    const savedColor = localStorage.getItem('st_phone_color') || '#333333';
+    const savedWallpaper = localStorage.getItem('st_phone_wallpaper') || 'https://images.unsplash.com/photo-1557683316-973673baf926?q=80&w=400&auto=format&fit=crop';
+
+    // อัปเดต UI ในหน้า Settings
+    const colorInput = document.getElementById('setting-phone-color');
+    const wpInput = document.getElementById('setting-wallpaper-url');
+    if (colorInput) colorInput.value = savedColor;
+    if (wpInput) wpInput.value = savedWallpaper;
+
+    // นำไปใช้กับโทรศัพท์
+    document.getElementById('st-phone-container').style.borderColor = savedColor;
+    document.getElementById('st-phone-home').style.backgroundImage = `url('${savedWallpaper}')`;
+}
+
+// กดปุ่ม Apply Changes
+window.applyPhoneSettings = function() {
+    const newColor = document.getElementById('setting-phone-color').value;
+    const newWallpaper = document.getElementById('setting-wallpaper-url').value;
+
+    if (newWallpaper) {
+        localStorage.setItem('st_phone_wallpaper', newWallpaper);
+        document.getElementById('st-phone-home').style.backgroundImage = `url('${newWallpaper}')`;
+    }
+
+    localStorage.setItem('st_phone_color', newColor);
+    document.getElementById('st-phone-container').style.borderColor = newColor;
+
+    alert("Phone settings applied!");
+};
+
+// เรียกใช้ฟังก์ชันนี้ตอนโหลด Extension เพื่อตั้งค่าสีและวอลเปเปอร์เริ่มต้น
 jQuery(async () => {
-    console.log("📱 ST Virtual Phone Phase 2 Loaded!");
+    console.log("📱 ST Virtual Phone Loaded!");
     createPhoneUI();
+    setupSettingsMenu();
     setupMessageHook();
+    loadPhoneSettings(); // <--- เพิ่มบรรทัดนี้
+    initImageDB(); // เดี๋ยวเราจะเขียนฟังก์ชันนี้ในขั้นตอนถัดไป
 });
