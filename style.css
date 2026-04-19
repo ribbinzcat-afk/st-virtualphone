@@ -70,7 +70,7 @@
     border: 10px solid #333;
     border-radius: 30px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-    z-index: 9999;
+    z-index: 99999;
     display: none;
     flex-direction: column;
     overflow: hidden;
