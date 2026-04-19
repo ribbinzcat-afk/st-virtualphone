@@ -237,8 +237,8 @@ function createPhoneUI() {
                     </div>
                 </div>
             `;
-                } else if (app.id === 'settings') {
-            // --- โครงสร้างแอป SETTINGS ---
+                        } else if (app.id === 'settings') {
+            // --- โครงสร้างแอป SETTINGS (อัปเดตเต็มรูปแบบ) ---
             appWindow.innerHTML = `
                 <div class="st-app-header" style="background-color: #f2f2f7;">
                     <div class="st-back-btn" onclick="document.getElementById('window-${app.id}').style.display='none'">❮</div>
@@ -247,7 +247,7 @@ function createPhoneUI() {
                 </div>
                 <div class="st-app-content settings-container">
 
-                    <!-- ส่วนที่ 1: ปรับแต่งโทรศัพท์ -->
+                    <!-- ส่วนที่ 1: ปรับแต่งโทรศัพท์ (สี & Wallpaper) -->
                     <div class="settings-section">
                         <h4>🎨 Personalization</h4>
                         <div class="settings-row">
@@ -255,10 +255,10 @@ function createPhoneUI() {
                             <input type="color" id="setting-phone-color" value="#333333" class="settings-input" style="width: 50px; padding: 0;">
                         </div>
                         <div class="settings-row">
-                            <span>Wallpaper</span>
-                            <input type="text" id="setting-wallpaper-url" placeholder="Image URL or Upload Base64" class="settings-input">
+                            <span>Wallpaper URL</span>
+                            <input type="text" id="setting-wallpaper-url" placeholder="Image URL or Base64" class="settings-input">
                         </div>
-                        <!-- เพิ่มปุ่มอัปโหลดไฟล์ตรงนี้ -->
+                        <!-- ปุ่มอัปโหลดไฟล์สำหรับ Wallpaper -->
                         <div class="settings-row">
                             <input type="file" id="setting-wallpaper-file" accept="image/*" style="width: 70%; font-size: 12px;">
                             <button class="settings-btn" onclick="uploadWallpaperFile()">Upload</button>
@@ -269,6 +269,8 @@ function createPhoneUI() {
                     <!-- ส่วนที่ 2: จัดการรูปภาพ (Sticker / IG) -->
                     <div class="settings-section">
                         <h4>🖼️ Image Library (Sticker/IG)</h4>
+
+                        <!-- ช่องเลือกประเภทและตั้งชื่อ Keyword -->
                         <div class="settings-row">
                             <select id="image-upload-type" class="settings-input" style="width: 40%;">
                                 <option value="sticker">Sticker</option>
@@ -276,11 +278,14 @@ function createPhoneUI() {
                             </select>
                             <input type="text" id="image-keyword" placeholder="Keyword (e.g. cat_cry)" class="settings-input" style="width: 55%;">
                         </div>
+
+                        <!-- ปุ่มอัปโหลดไฟล์สำหรับ Sticker/IG -->
                         <div class="settings-row">
                             <input type="file" id="image-file-input" accept="image/*" style="width: 70%; font-size: 12px;">
-                            <button class="settings-btn" onclick="uploadImageToDB()">Save</button>
+                            <button class="settings-btn" onclick="uploadImageToDB()" style="background-color: #28a745;">Save</button>
                         </div>
 
+                        <!-- ลิสต์แสดงรูปภาพที่บันทึกไว้ -->
                         <div id="sticker-list-container">
                             <div style="text-align: center; color: #888; font-size: 12px;">Loading saved images...</div>
                         </div>
