@@ -1798,8 +1798,6 @@ window.addTwitterReplyToUI_NoSave = function(tweetId, name, text) {
 };
 
 // --- 2.4 แทรกคำสั่งโหลด History ตอนเริ่ม ---
-// ค้นหา eventSource.on(event_types.CHAT_CHANGED) แล้วเพิ่ม loadTwitterHistoryForCurrentChar()
-const originalChatChanged = eventSource.listeners(event_types.CHAT_CHANGED);
 eventSource.on(event_types.CHAT_CHANGED, () => {
     loadTwitterHistoryForCurrentChar();
 });
