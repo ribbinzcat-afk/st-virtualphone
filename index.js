@@ -4,6 +4,8 @@ import { eventSource, event_types } from "../../../../script.js";
 
 let isPhoneOpen = false;
 let isFabVisible = true;
+// ตัวแปรสำหรับเช็คว่ากำลังลากปุ่มอยู่หรือไม่ (ป้องกันการคลิกเปิดโทรศัพท์ตอนลาก)
+let isDragging = false;
 
 // เก็บข้อมูลแอป
 const apps = [
@@ -20,6 +22,9 @@ function createPhoneUI() {
     fab.innerHTML = `📱<div id="st-phone-badge"></div>`;
     document.body.appendChild(fab);
 
+    // เรียกใช้ฟังก์ชันทำให้ปุ่มลากได้
+    makeDraggable(fab);
+    
     // 2. สร้างกรอบโทรศัพท์
     const phoneContainer = document.createElement('div');
     phoneContainer.id = 'st-phone-container';
@@ -68,7 +73,122 @@ function createPhoneUI() {
     phoneContainer.appendChild(screen);
     document.body.appendChild(phoneContainer);
 
-    fab.addEventListener('click', togglePhone);
+    // อัปเดต Event Click: เปิดโทรศัพท์ก็ต่อเมื่อ "ไม่ได้กำลังลาก"
+    fab.addEventListener('click', (e) => {
+        if (!isDragging) {
+            togglePhone();
+        }
+    });
+}
+
+// --- ฟังก์ชันทำให้ปุ่มลากได้ (Draggable) ---
+function makeDraggable(element) {
+    let currentX;
+    let currentY;
+    let initialX;
+    let initialY;
+    let xOffset = 0;
+    let yOffset = 0;
+    let active = false;
+
+    // รองรับทั้งเมาส์ (คอม) และนิ้ว (มือถือ)
+    element.addEventListener("touchstart", dragStart, { passive: false });
+    document.addEventListener("touchend", dragEnd, false);
+    document.addEventListener("touchmove", drag, { passive: false });
+
+    element.addEventListener("mousedown", dragStart, false);
+    document.addEventListener("mouseup", dragEnd, false);
+    document.addEventListener("mousemove", drag, false);
+
+    function dragStart(e) {
+        if (e.type === "touchstart") {
+            initialX = e.touches[0].clientX - xOffset;
+            initialY = e.touches[0].clientY - yOffset;
+        } else {
+            initialX = e.clientX - xOffset;
+            initialY = e.clientY - yOffset;
+        }
+
+        // เช็คว่ากดที่ตัวปุ่มจริงๆ
+        if (e.target === element || element.contains(e.target)) {
+            active = true;
+            isDragging = false; // รีเซ็ตสถานะ
+        }
+    }
+
+    function dragEnd(e) {
+        initialX = currentX;
+        initialY = currentY;
+        active = false;
+
+        // หน่วงเวลาเล็กน้อยก่อนรีเซ็ต isDragging เพื่อให้ Event Click ทำงานได้ถูกต้อง
+        setTimeout(() => {
+            isDragging = false;
+        }, 50);
+    }
+
+    function drag(e) {
+        if (active) {
+            e.preventDefault(); // ป้องกันพฤติกรรมแปลกๆ บนมือถือ
+            isDragging = true; // ตั้งสถานะว่ากำลังลากอยู่ (จะไม่เปิดโทรศัพท์)
+
+            if (e.type === "touchmove") {
+                currentX = e.touches[0].clientX - initialX;
+                currentY = e.touches[0].clientY - initialY;
+            } else {
+                currentX = e.clientX - initialX;
+                currentY = e.clientY - initialY;
+            }
+
+            xOffset = currentX;
+            yOffset = currentY;
+
+            // อัปเดตตำแหน่งปุ่ม
+            setTranslate(currentX, currentY, element);
+        }
+    }
+
+    function setTranslate(xPos, yPos, el) {
+        el.style.transform = `translate3d(${xPos}px, ${yPos}px, 0)`;
+    }
+
+    // --- ป้องกันปุ่มหายเมื่อย่อ/ขยายหน้าจอ (Window Resize) ---
+    window.addEventListener('resize', () => {
+        const rect = element.getBoundingClientRect();
+        const winWidth = window.innerWidth;
+        const winHeight = window.innerHeight;
+
+        let needsAdjustment = false;
+        let newX = xOffset;
+        let newY = yOffset;
+
+        // เช็คว่าปุ่มทะลุขอบขวาหรือล่างไหม
+        if (rect.right > winWidth) {
+            newX = xOffset - (rect.right - winWidth) - 20; // ถอยกลับมา 20px
+            needsAdjustment = true;
+        }
+        if (rect.bottom > winHeight) {
+            newY = yOffset - (rect.bottom - winHeight) - 20;
+            needsAdjustment = true;
+        }
+
+        // เช็คว่าปุ่มทะลุขอบซ้ายหรือบนไหม
+        if (rect.left < 0) {
+            newX = xOffset - rect.left + 20;
+            needsAdjustment = true;
+        }
+        if (rect.top < 0) {
+            newY = yOffset - rect.top + 20;
+            needsAdjustment = true;
+        }
+
+        // ถ้าปุ่มตกขอบ ให้เด้งกลับเข้ามาในจอ
+        if (needsAdjustment) {
+            xOffset = newX;
+            yOffset = newY;
+            setTranslate(newX, newY, element);
+        }
+    });
 }
 
 // ฟังก์ชันเปิดแอป
