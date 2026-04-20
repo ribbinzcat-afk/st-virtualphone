@@ -600,15 +600,19 @@ function renderMessageToUI(senderName, message, isMe, timeString) {
     contentLine.scrollTop = contentLine.scrollHeight;
 }
 
-// --- ระบบ Regex Hook ดักจับข้อความจาก AI (อัปเดตใหม่) ---
-// --- ระบบ Regex Hook ดักจับข้อความจาก AI (แก้บั๊กเปลี่ยนแชทแล้วไม่ทำงาน) ---
+// --- ระบบ Regex Hook ดักจับข้อความจาก AI (รองรับ Streaming 100%) ---
 function setupMessageHook() {
-    // ใช้ MutationObserver แทน setInterval เพื่อประสิทธิภาพที่ดีกว่า
-    const observer = new MutationObserver((mutations) => {        // ค้นหาข้อความทั้งหมดในหน้าจอที่ยังไม่ได้ถูกประมวลผล (ยังไม่มีคลาส st-processed)
-    const newMessages = document.querySelectorAll('.mes_text:not(.st-processed)');
+    setInterval(() => {
+        // ดึงข้อความทั้งหมดในหน้าจอมาเช็ค
+        const messages = document.querySelectorAll('.mes_text');
 
-        newMessages.forEach(msgElement => {
-            let text = msgElement.innerHTML;
+        messages.forEach(msgElement => {
+            const currentHtml = msgElement.innerHTML;
+
+            // ถ้าข้อความไม่มีอะไรอัปเดต (เหมือนเดิมเป๊ะ) ให้ข้ามไปเลย จะได้ไม่กินสเปคเครื่อง
+            if (msgElement.dataset.lastProcessedHtml === currentHtml) return;
+
+            let text = currentHtml;
             let originalText = text;
             let hasNotification = false;
 
@@ -705,17 +709,15 @@ function setupMessageHook() {
                 return `<span style="display:none;">${match}</span>`;
             });
 
-// เขียนทับเมื่อมีการเปลี่ยนแปลงเท่านั้น
+            // อัปเดตข้อความบนหน้าจอ ถ้ามีการซ่อนฟอร์แมต
             if (text !== originalText) {
                 msgElement.innerHTML = text;
+                msgElement.dataset.lastProcessedHtml = text; // จำข้อความที่ซ่อนแล้ว
+            } else {
+                msgElement.dataset.lastProcessedHtml = currentHtml; // จำข้อความเดิม
             }
-            // ติดแท็กว่าประมวลผลแล้ว
-            msgElement.classList.add('st-processed');
         });
-    });
-
-    // เริ่มการดักจับใน body หรือ container ของแชท
-    observer.observe(document.body, { childList: true, subtree: true });
+    }, 500); // ปรับให้เช็คไวขึ้นเป็นทุกๆ ครึ่งวินาที เพื่อให้เนียนไปกับ Streaming
 
     // โหลดข้อมูลเริ่มต้น
     loadLineHistoryForCurrentChar();
@@ -1606,7 +1608,7 @@ window.previewIGUpload = function(input) {
     reader.readAsDataURL(file);
 };
 
-// 3. ผู้ใช้กด Share โพสต์ของตัวเอง
+// ผู้ใช้กด Share โพสต์ของตัวเอง (แก้บั๊กความจำเต็ม)
 window.submitIGPost = function() {
     const caption = document.getElementById('ig-caption-input').value.trim();
     const hiddenDesc = document.getElementById('ig-hidden-desc-input').value.trim();
@@ -1616,14 +1618,31 @@ window.submitIGPost = function() {
     const context = getContext();
     const myName = context.name1 || "Me";
 
-    // สร้างโพสต์โชว์ในหน้าจอ (ส่ง base64 เข้าไปตรงๆ)
-    renderIGPostUI(myName, tempIGBase64, caption, 'base64', '');
+    // สร้างชื่อ ID เฉพาะให้รูปนี้
+    const uniqueKeyword = 'userpost_' + Date.now();
 
-    // ส่ง Prompt เบื้องหลังบอก AI
-    const promptText = `[IG Post โดย ${myName}: (ภาพ: ${hiddenDesc}) แคปชั่น: "${caption}"] <span style="display:none;">(OOC: คุณสามารถคอมเมนต์โพสต์นี้ได้โดยพิมพ์ [IG|comment|ข้อความคอมเมนต์])</span>`;
-    sendHiddenPrompt(promptText);
+    // เอาไฟล์รูปไปฝากไว้ใน IndexedDB แทนที่จะเซฟลง LocalStorage ตรงๆ
+    if (imageDB) {
+        const transaction = imageDB.transaction([STORE_NAME], "readwrite");
+        const store = transaction.objectStore(STORE_NAME);
+        store.put({
+            id: `ig_${uniqueKeyword}`,
+            type: 'ig',
+            keyword: uniqueKeyword,
+            data: tempIGBase64
+        }).onsuccess = function() {
+            // สั่งสร้างโพสต์โดยให้ระบบไปดึงรูปจาก Local แทน
+            renderIGPostUI(myName, '', caption, 'local', uniqueKeyword);
 
-    closeIGCreatePost();
+            // ส่ง Prompt เบื้องหลังบอก AI
+            const promptText = `[IG Post โดย ${myName}: (ภาพ: ${hiddenDesc}) แคปชั่น: "${caption}"] <span style="display:none;">(OOC: คุณสามารถคอมเมนต์โพสต์นี้ได้โดยพิมพ์ [IG|comment|ข้อความคอมเมนต์])</span>`;
+            sendHiddenPrompt(promptText);
+
+            closeIGCreatePost();
+        };
+    } else {
+        alert("Database not ready!");
+    }
 };
 
 // ฟังก์ชันหลักสำหรับสร้าง UI โพสต์ (เมื่อมีการโพสต์ใหม่)
