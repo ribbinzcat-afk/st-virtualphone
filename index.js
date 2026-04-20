@@ -603,10 +603,9 @@ function renderMessageToUI(senderName, message, isMe, timeString) {
 // --- ระบบ Regex Hook ดักจับข้อความจาก AI (อัปเดตใหม่) ---
 // --- ระบบ Regex Hook ดักจับข้อความจาก AI (แก้บั๊กเปลี่ยนแชทแล้วไม่ทำงาน) ---
 function setupMessageHook() {
-    // ใช้ setInterval เพื่อดักจับข้อความแบบ Global (ทำงานทุกแชทแน่นอน 100%)
-    setInterval(() => {
-        // ค้นหาข้อความทั้งหมดในหน้าจอที่ยังไม่ได้ถูกประมวลผล (ยังไม่มีคลาส st-processed)
-        const newMessages = document.querySelectorAll('.mes_text:not(.st-processed)');
+    // ใช้ MutationObserver แทน setInterval เพื่อประสิทธิภาพที่ดีกว่า
+    const observer = new MutationObserver((mutations) => {        // ค้นหาข้อความทั้งหมดในหน้าจอที่ยังไม่ได้ถูกประมวลผล (ยังไม่มีคลาส st-processed)
+    const newMessages = document.querySelectorAll('.mes_text:not(.st-processed)');
 
         newMessages.forEach(msgElement => {
             let text = msgElement.innerHTML;
@@ -706,21 +705,23 @@ function setupMessageHook() {
                 return `<span style="display:none;">${match}</span>`;
             });
 
-            // ถ้ามีการเปลี่ยนแปลง ให้เขียนทับและติดแท็กว่าประมวลผลแล้ว
+// เขียนทับเมื่อมีการเปลี่ยนแปลงเท่านั้น
             if (text !== originalText) {
                 msgElement.innerHTML = text;
             }
-            // ติดแท็กว่าข้อความนี้ถูกเช็คแล้ว จะได้ไม่เช็คซ้ำให้เครื่องหน่วง
+            // ติดแท็กว่าประมวลผลแล้ว
             msgElement.classList.add('st-processed');
         });
-    }, 1000); // เช็คทุกๆ 1 วินาที
-    
-    // โหลดประวัติแชทของตัวละครนี้ขึ้นมาแสดง
-        loadLineHistoryForCurrentChar();
-        updateLineChatList();
-        loadIGHistoryForCurrentChar(); 
-}
+    });
 
+    // เริ่มการดักจับใน body หรือ container ของแชท
+    observer.observe(document.body, { childList: true, subtree: true });
+
+    // โหลดข้อมูลเริ่มต้น
+    loadLineHistoryForCurrentChar();
+    updateLineChatList();
+    loadIGHistoryForCurrentChar();
+}
 
 function handleNewMessage(messageId) {
     const msgElement = document.querySelector(`.mes[mesid="${messageId}"] .mes_text`);
@@ -849,12 +850,15 @@ function handleNewMessage(messageId) {
         return `<span style="display:none;" class="hidden-ig-msg">${match}</span>`;
     });
 
-    // แบบที่ 2: AI คอมเมนต์ -> [IG|comment|ข้อความ]
-    const igCommentRegex = /\[IG\|comment\|(.*?)\]/gi;
-    text = text.replace(igCommentRegex, (match, commentText) => {
-        const sender = getContext().name2 || "Unknown";
+    // แบบที่ 2: AI คอมเมนต์ -> รองรับทั้ง [IG|comment|ข้อความ] และ [IG|comment|ชื่อ|ข้อความ]
+    const igCommentRegex = /\[IG\|comment\|(?:(.*?)\|)?(.*?)\]/gi;
+    text = text.replace(igCommentRegex, (match, nameOpt, commentText) => {
+        // ถ้ามีการระบุชื่อมา ให้ใช้ชื่อนั้น ถ้าไม่มีให้ใช้ชื่อบอทปัจจุบัน
+        const sender = nameOpt ? nameOpt.trim() : (getContext().name2 || "Unknown");
+
         if (latestPostId) {
-            addCommentToUI(latestPostId, sender, commentText.trim());
+            saveIGCommentToStorage(latestPostId, { name: sender, text: commentText.trim() });
+            addCommentToUI_NoSave(latestPostId, sender, commentText.trim());
             hasNotification = true;
             triggerNotification('ig');
         }
@@ -1205,7 +1209,6 @@ let isCallActive = false;
 let callTimerInterval;
 let callSeconds = 0;
 
-// เมื่อมีสายเข้า
 // เมื่อมีสายเข้า (AI โทรมา)
 window.triggerIncomingCall = function(callerName) {
     currentCallerName = callerName;
@@ -1248,7 +1251,6 @@ window.initiateCallOut = function() {
     isCallActive = true; // เปิดสถานะสาย
 };
 
-// แก้ไขฟังก์ชัน acceptCall (ตอนเรารับสาย) ให้เซ็ตภาพพื้นหลังด้วย
 // กดรับสาย
 window.acceptCall = function() {
     isCallActive = true;
