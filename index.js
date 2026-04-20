@@ -610,7 +610,30 @@ function renderMessageToUI(senderName, message, isMe, timeString) {
 }
 
 // --- ระบบ Regex Hook ดักจับข้อความจาก AI (แก้บั๊กน้องขยันทำซ้ำ) ---
+// --- ระบบ Regex Hook ดักจับข้อความจาก AI (แยกแยะข้อความเก่า/ใหม่) ---
+let ignoreMesIds = new Set();
+let isChatLoading = true;
+
+// ฟังก์ชันจดจำข้อความเก่าทั้งหมดในหน้าจอ
+function markExistingMessagesAsIgnored() {
+    const allMes = document.querySelectorAll('.mes');
+    allMes.forEach(mes => {
+        const mesId = mes.getAttribute('mesid');
+        if (mesId) ignoreMesIds.add(mesId);
+    });
+    isChatLoading = false;
+    console.log("📱 ระบบจำข้อความเก่าเสร็จสิ้น จะไม่แจ้งเตือนซ้ำแล้ว");
+}
+
 function setupMessageHook() {
+    // ให้ระบบจดจำข้อความเก่าตอนโหลดแชทเสร็จ
+    eventSource.on(event_types.CHAT_CHANGED, () => {
+        isChatLoading = true;
+        ignoreMesIds.clear();
+        setTimeout(markExistingMessagesAsIgnored, 1500);
+    });
+    setTimeout(markExistingMessagesAsIgnored, 1500);
+
     setInterval(() => {
         const messages = document.querySelectorAll('.mes_text');
 
@@ -618,38 +641,46 @@ function setupMessageHook() {
             const currentHtml = msgElement.innerHTML;
             if (msgElement.dataset.lastProcessedHtml === currentHtml) return;
 
+            // เช็คว่าข้อความนี้เป็นข้อความเก่าที่โหลดมา หรือข้อความใหม่เอี่ยม
+            const parentMes = msgElement.closest('.mes');
+            const mesId = parentMes ? parentMes.getAttribute('mesid') : null;
+            const isOldMessage = isChatLoading || (mesId && ignoreMesIds.has(mesId));
+
             let text = currentHtml;
             let originalText = text;
             let hasNotification = false;
 
-            // สร้างสมุดจดบันทึกของแต่ละข้อความ ว่าเคยดึงอันไหนไปแล้วบ้าง
             let processedMatches = msgElement.dataset.processedMatches ? JSON.parse(msgElement.dataset.processedMatches) : [];
 
             // 1. Line
             text = text.replace(/\[Line[:|]\s*(.*?)(?:\|(.*?))?\]/gi, (match, p1, p2) => {
                 if (!processedMatches.includes(match)) {
-                    const sender = p2 ? p1.trim() : (getContext().name2 || "Unknown");
-                    const message = p2 ? p2.trim() : p1.trim();
-                    saveLineMessage(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-                    if (currentActiveLineChat === sender) {
-                        renderMessageToUI(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                    if (!isOldMessage) { // ทำงานเฉพาะข้อความใหม่
+                        const sender = p2 ? p1.trim() : (getContext().name2 || "Unknown");
+                        const message = p2 ? p2.trim() : p1.trim();
+                        saveLineMessage(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                        if (currentActiveLineChat === sender) {
+                            renderMessageToUI(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                        }
+                        updateLineChatList();
+                        hasNotification = true; triggerNotification('line');
                     }
-                    updateLineChatList();
-                    hasNotification = true; triggerNotification('line');
-                    processedMatches.push(match); // จดไว้ว่าทำแล้ว
+                    processedMatches.push(match);
                 }
-                return `<span style="display:none;">${match}</span>`;
+                return `<span style="display:none;">${match}</span>`; // ซ่อนข้อความเสมอ
             });
 
             // 1.5 Sticker
             text = text.replace(/\[Sticker[:|]\s*(.*?)\]/gi, (match, keyword) => {
                 if (!processedMatches.includes(match)) {
-                    const cleanKeyword = keyword.trim().toLowerCase();
-                    const sender = getContext().name2 || "Unknown";
-                    const stickerHtml = `<div class="st-async-sticker" data-keyword="${cleanKeyword}" style="width: 120px; height: 120px; background-color: #eee; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #888;">Loading...</div>`;
-                    addMessageToLineUI(sender, stickerHtml, false);
-                    fetchAndRenderSticker(cleanKeyword);
-                    hasNotification = true; triggerNotification('line');
+                    if (!isOldMessage) {
+                        const cleanKeyword = keyword.trim().toLowerCase();
+                        const sender = getContext().name2 || "Unknown";
+                        const stickerHtml = `<div class="st-async-sticker" data-keyword="${cleanKeyword}" style="width: 120px; height: 120px; background-color: #eee; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #888;">Loading...</div>`;
+                        addMessageToLineUI(sender, stickerHtml, false);
+                        fetchAndRenderSticker(cleanKeyword);
+                        hasNotification = true; triggerNotification('line');
+                    }
                     processedMatches.push(match);
                 }
                 return `<span style="display:none;">${match}</span>`;
@@ -658,9 +689,11 @@ function setupMessageHook() {
             // 2. Phone (Call)
             text = text.replace(/\[Call[:|]\s*(.*?)\]/gi, (match, caller) => {
                 if (!processedMatches.includes(match)) {
-                    const callerName = caller.trim() || (getContext().name2 || "Unknown");
-                    setTimeout(() => triggerIncomingCall(callerName), 500);
-                    hasNotification = true;
+                    if (!isOldMessage) { // ถ้าเป็นสายเก่า จะไม่เด้งโทรศัพท์
+                        const callerName = caller.trim() || (getContext().name2 || "Unknown");
+                        setTimeout(() => triggerIncomingCall(callerName), 500);
+                        hasNotification = true;
+                    }
                     processedMatches.push(match);
                 }
                 return `<span style="display:none;">${match}</span>`;
@@ -669,20 +702,22 @@ function setupMessageHook() {
             // 3. Phone (Active)
             text = text.replace(/\[Phone(?:\|(.*?))?[:|]\s*(.*?)\]/gi, (match, sender, message) => {
                 if (!processedMatches.includes(match)) {
-                    if (isCallActive) {
+                    if (!isOldMessage && isCallActive) {
                         addTranscriptMessage(message.trim(), false);
                         hasNotification = true;
-                        processedMatches.push(match);
                     }
+                    processedMatches.push(match);
                 }
-                return isCallActive ? `<span style="display:none;">${match}</span>` : match;
+                return isCallActive && !isOldMessage ? `<span style="display:none;">${match}</span>` : match;
             });
 
             // 4. Music
             text = text.replace(/\[Music[:|]\s*(https?:\/\/[^\s\]]+)\]/gi, (match, url) => {
                 if (!processedMatches.includes(match)) {
-                    playMusicTrack(url.trim());
-                    hasNotification = true; triggerNotification('music');
+                    if (!isOldMessage) {
+                        playMusicTrack(url.trim());
+                        hasNotification = true; triggerNotification('music');
+                    }
                     processedMatches.push(match);
                 }
                 return `<span style="display:none;">${match}</span>`;
@@ -691,15 +726,17 @@ function setupMessageHook() {
             // 5. IG Post
             text = text.replace(/\[IG\|post\|(web|local)\|(.*?)\|(.*?)\]/gi, (match, source, keyword, caption) => {
                 if (!processedMatches.includes(match)) {
-                    const sender = getContext().name2 || "Unknown";
-                    if (source.trim().toLowerCase() === 'web') {
-                        const cleanKeyword = keyword.replace(/\s+/g, ',');
-                        const randomNum = Math.floor(Math.random() * 1000);
-                        renderIGPostUI(sender, `https://loremflickr.com/400/400/${cleanKeyword}?random=${randomNum}`, caption.trim(), 'web', keyword.trim());
-                    } else {
-                        renderIGPostUI(sender, '', caption.trim(), 'local', keyword.trim());
+                    if (!isOldMessage) {
+                        const sender = getContext().name2 || "Unknown";
+                        if (source.trim().toLowerCase() === 'web') {
+                            const cleanKeyword = keyword.replace(/\s+/g, ',');
+                            const randomNum = Math.floor(Math.random() * 1000);
+                            renderIGPostUI(sender, `https://loremflickr.com/400/400/${cleanKeyword}?random=${randomNum}`, caption.trim(), 'web', keyword.trim());
+                        } else {
+                            renderIGPostUI(sender, '', caption.trim(), 'local', keyword.trim());
+                        }
+                        hasNotification = true; triggerNotification('ig');
                     }
-                    hasNotification = true; triggerNotification('ig');
                     processedMatches.push(match);
                 }
                 return `<span style="display:none;">${match}</span>`;
@@ -708,11 +745,13 @@ function setupMessageHook() {
             // 5.5 IG Comment
             text = text.replace(/\[IG\|comment\|(?:(.*?)\|)?(.*?)\]/gi, (match, nameOpt, commentText) => {
                 if (!processedMatches.includes(match)) {
-                    const sender = nameOpt ? nameOpt.trim() : (getContext().name2 || "Unknown");
-                    if (latestPostId) {
-                        saveIGCommentToStorage(latestPostId, { name: sender, text: commentText.trim() });
-                        addCommentToUI_NoSave(latestPostId, sender, commentText.trim());
-                        hasNotification = true; triggerNotification('ig');
+                    if (!isOldMessage) {
+                        const sender = nameOpt ? nameOpt.trim() : (getContext().name2 || "Unknown");
+                        if (latestPostId) {
+                            saveIGCommentToStorage(latestPostId, { name: sender, text: commentText.trim() });
+                            addCommentToUI_NoSave(latestPostId, sender, commentText.trim());
+                            hasNotification = true; triggerNotification('ig');
+                        }
                     }
                     processedMatches.push(match);
                 }
@@ -722,9 +761,11 @@ function setupMessageHook() {
             // 6. Twitter Post
             text = text.replace(/\[Twitter\|post\|(.*?)\]/gi, (match, twText) => {
                 if (!processedMatches.includes(match)) {
-                    const sender = getContext().name2 || "Unknown";
-                    renderTwitterPostUI(sender, twText.trim());
-                    hasNotification = true; triggerNotification('twitter');
+                    if (!isOldMessage) {
+                        const sender = getContext().name2 || "Unknown";
+                        renderTwitterPostUI(sender, twText.trim());
+                        hasNotification = true; triggerNotification('twitter');
+                    }
                     processedMatches.push(match);
                 }
                 return `<span style="display:none;">${match}</span>`;
@@ -733,18 +774,19 @@ function setupMessageHook() {
             // 6.5 Twitter Reply
             text = text.replace(/\[Twitter\|reply\|(.*?)\]/gi, (match, replyText) => {
                 if (!processedMatches.includes(match)) {
-                    const sender = getContext().name2 || "Unknown";
-                    if (latestTweetId) {
-                        saveTwitterReply(latestTweetId, { name: sender, text: replyText.trim() });
-                        addTwitterReplyToUI_NoSave(latestTweetId, sender, replyText.trim());
-                        hasNotification = true; triggerNotification('twitter');
+                    if (!isOldMessage) {
+                        const sender = getContext().name2 || "Unknown";
+                        if (latestTweetId) {
+                            saveTwitterReply(latestTweetId, { name: sender, text: replyText.trim() });
+                            addTwitterReplyToUI_NoSave(latestTweetId, sender, replyText.trim());
+                            hasNotification = true; triggerNotification('twitter');
+                        }
                     }
                     processedMatches.push(match);
                 }
                 return `<span style="display:none;">${match}</span>`;
             });
 
-            // อัปเดตข้อความบนหน้าจอ และเซฟสมุดจดบันทึก
             if (text !== originalText) {
                 msgElement.innerHTML = text;
                 msgElement.dataset.lastProcessedHtml = text;
@@ -752,7 +794,6 @@ function setupMessageHook() {
                 msgElement.dataset.lastProcessedHtml = currentHtml;
             }
 
-            // เก็บสมุดจดบันทึกคืนเข้าไปใน HTML
             msgElement.dataset.processedMatches = JSON.stringify(processedMatches);
         });
     }, 500);
