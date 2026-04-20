@@ -747,11 +747,7 @@ function setupMessageHook() {
             msgElement.dataset.processedMatches = JSON.stringify(processedMatches);
         });
     }, 500);
-
-    // โหลดข้อมูลเริ่มต้น
-    loadLineHistoryForCurrentChar();
-    updateLineChatList();
-    loadIGHistoryForCurrentChar();
+}
 
 function handleNewMessage(messageId) {
     const msgElement = document.querySelector(`.mes[mesid="${messageId}"] .mes_text`);
