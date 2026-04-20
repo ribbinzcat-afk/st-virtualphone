@@ -276,18 +276,26 @@ function createPhoneUI() {
                     </div>
                 </div>
 
-                <!-- หน้า 2: สายเรียกเข้า (Incoming Call) เหมือนเดิม -->
+                <!-- หน้า 2: สายเรียกเข้า (Incoming Call) อัปเกรดปุ่ม -->
                 <div id="phone-incoming-view" style="display: none; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center;">
                     <div class="phone-large-avatar" id="incoming-avatar"></div>
                     <div class="phone-caller-name" id="incoming-name">Unknown</div>
                     <div class="phone-status-text">Incoming Call...</div>
                     <div class="phone-action-buttons">
-                        <div class="phone-btn phone-btn-decline" onclick="declineCall()">📴</div>
-                        <div class="phone-btn phone-btn-accept" onclick="acceptCall()">📞</div>
+                        <!-- กลุ่มปุ่มตัดสาย -->
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <div class="phone-btn phone-btn-decline" onclick="declineCall()">📴</div>
+                            <div class="phone-btn-label">Decline</div>
+                        </div>
+                        <!-- กลุ่มปุ่มรับสาย -->
+                        <div style="display: flex; flex-direction: column; align-items: center;">
+                            <div class="phone-btn phone-btn-accept" onclick="acceptCall()">📞</div>
+                            <div class="phone-btn-label">Accept</div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- หน้า 3: กำลังคุยสาย (Active Call) อัปเกรด UI -->
+                <!-- หน้า 3: กำลังคุยสาย (Active Call) อัปเกรดปุ่มวางสาย -->
                 <div id="phone-active-view">
                     <div class="active-call-overlay"></div>
                     <div class="active-call-content">
@@ -301,8 +309,9 @@ function createPhoneUI() {
                             <input type="text" id="phone-input" placeholder="Speak..." style="flex: 1; border: none; border-radius: 20px; padding: 10px 15px; background-color: #2c2c2e; color: white; outline: none;">
                             <div style="color: #007aff; padding: 10px; font-weight: bold; cursor: pointer;" onclick="sendPhoneMessage()">Send</div>
                         </div>
-                        <div class="active-call-controls" style="background: rgba(0,0,0,0.8);">
-                            <div class="call-control-btn end-call" onclick="endCall()">📴</div>
+                        <div class="active-call-controls">
+                            <!-- ปุ่มวางสายแถบยาว -->
+                            <div class="call-control-btn end-call" onclick="endCall()">📴 End Call</div>
                         </div>
                     </div>
                 </div>
