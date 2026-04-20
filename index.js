@@ -600,130 +600,158 @@ function renderMessageToUI(senderName, message, isMe, timeString) {
     contentLine.scrollTop = contentLine.scrollHeight;
 }
 
-// --- ระบบ Regex Hook ดักจับข้อความจาก AI (รองรับ Streaming 100%) ---
+// --- ระบบ Regex Hook ดักจับข้อความจาก AI (แก้บั๊กน้องขยันทำซ้ำ) ---
 function setupMessageHook() {
     setInterval(() => {
-        // ดึงข้อความทั้งหมดในหน้าจอมาเช็ค
         const messages = document.querySelectorAll('.mes_text');
 
         messages.forEach(msgElement => {
             const currentHtml = msgElement.innerHTML;
-
-            // ถ้าข้อความไม่มีอะไรอัปเดต (เหมือนเดิมเป๊ะ) ให้ข้ามไปเลย จะได้ไม่กินสเปคเครื่อง
             if (msgElement.dataset.lastProcessedHtml === currentHtml) return;
 
             let text = currentHtml;
             let originalText = text;
             let hasNotification = false;
 
+            // สร้างสมุดจดบันทึกของแต่ละข้อความ ว่าเคยดึงอันไหนไปแล้วบ้าง
+            let processedMatches = msgElement.dataset.processedMatches ? JSON.parse(msgElement.dataset.processedMatches) : [];
+
             // 1. Line
             text = text.replace(/\[Line[:|]\s*(.*?)(?:\|(.*?))?\]/gi, (match, p1, p2) => {
-                const sender = p2 ? p1.trim() : (getContext().name2 || "Unknown");
-                const message = p2 ? p2.trim() : p1.trim();
-                saveLineMessage(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-                if (currentActiveLineChat === sender) {
-                    renderMessageToUI(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                if (!processedMatches.includes(match)) {
+                    const sender = p2 ? p1.trim() : (getContext().name2 || "Unknown");
+                    const message = p2 ? p2.trim() : p1.trim();
+                    saveLineMessage(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                    if (currentActiveLineChat === sender) {
+                        renderMessageToUI(sender, message, false, new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                    }
+                    updateLineChatList();
+                    hasNotification = true; triggerNotification('line');
+                    processedMatches.push(match); // จดไว้ว่าทำแล้ว
                 }
-                updateLineChatList();
-                hasNotification = true; triggerNotification('line');
                 return `<span style="display:none;">${match}</span>`;
             });
 
             // 1.5 Sticker
             text = text.replace(/\[Sticker[:|]\s*(.*?)\]/gi, (match, keyword) => {
-                const cleanKeyword = keyword.trim().toLowerCase();
-                const sender = getContext().name2 || "Unknown";
-                const stickerHtml = `<div class="st-async-sticker" data-keyword="${cleanKeyword}" style="width: 120px; height: 120px; background-color: #eee; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #888;">Loading...</div>`;
-                addMessageToLineUI(sender, stickerHtml, false);
-                fetchAndRenderSticker(cleanKeyword);
-                hasNotification = true; triggerNotification('line');
+                if (!processedMatches.includes(match)) {
+                    const cleanKeyword = keyword.trim().toLowerCase();
+                    const sender = getContext().name2 || "Unknown";
+                    const stickerHtml = `<div class="st-async-sticker" data-keyword="${cleanKeyword}" style="width: 120px; height: 120px; background-color: #eee; border-radius: 10px; display: flex; justify-content: center; align-items: center; font-size: 10px; color: #888;">Loading...</div>`;
+                    addMessageToLineUI(sender, stickerHtml, false);
+                    fetchAndRenderSticker(cleanKeyword);
+                    hasNotification = true; triggerNotification('line');
+                    processedMatches.push(match);
+                }
                 return `<span style="display:none;">${match}</span>`;
             });
 
             // 2. Phone (Call)
             text = text.replace(/\[Call[:|]\s*(.*?)\]/gi, (match, caller) => {
-                const callerName = caller.trim() || (getContext().name2 || "Unknown");
-                setTimeout(() => triggerIncomingCall(callerName), 500);
-                hasNotification = true;
+                if (!processedMatches.includes(match)) {
+                    const callerName = caller.trim() || (getContext().name2 || "Unknown");
+                    setTimeout(() => triggerIncomingCall(callerName), 500);
+                    hasNotification = true;
+                    processedMatches.push(match);
+                }
                 return `<span style="display:none;">${match}</span>`;
             });
 
             // 3. Phone (Active)
             text = text.replace(/\[Phone(?:\|(.*?))?[:|]\s*(.*?)\]/gi, (match, sender, message) => {
-                if (isCallActive) {
-                    addTranscriptMessage(message.trim(), false);
-                    hasNotification = true;
-                    return `<span style="display:none;">${match}</span>`;
+                if (!processedMatches.includes(match)) {
+                    if (isCallActive) {
+                        addTranscriptMessage(message.trim(), false);
+                        hasNotification = true;
+                        processedMatches.push(match);
+                    }
                 }
-                return match;
+                return isCallActive ? `<span style="display:none;">${match}</span>` : match;
             });
 
             // 4. Music
             text = text.replace(/\[Music[:|]\s*(https?:\/\/[^\s\]]+)\]/gi, (match, url) => {
-                playMusicTrack(url.trim());
-                hasNotification = true; triggerNotification('music');
+                if (!processedMatches.includes(match)) {
+                    playMusicTrack(url.trim());
+                    hasNotification = true; triggerNotification('music');
+                    processedMatches.push(match);
+                }
                 return `<span style="display:none;">${match}</span>`;
             });
 
             // 5. IG Post
             text = text.replace(/\[IG\|post\|(web|local)\|(.*?)\|(.*?)\]/gi, (match, source, keyword, caption) => {
-                const sender = getContext().name2 || "Unknown";
-                if (source.trim().toLowerCase() === 'web') {
-                    const cleanKeyword = keyword.replace(/\s+/g, ',');
-                    const randomNum = Math.floor(Math.random() * 1000);
-                    renderIGPostUI(sender, `https://loremflickr.com/400/400/${cleanKeyword}?random=${randomNum}`, caption.trim(), 'web', keyword.trim());
-                } else {
-                    renderIGPostUI(sender, '', caption.trim(), 'local', keyword.trim());
+                if (!processedMatches.includes(match)) {
+                    const sender = getContext().name2 || "Unknown";
+                    if (source.trim().toLowerCase() === 'web') {
+                        const cleanKeyword = keyword.replace(/\s+/g, ',');
+                        const randomNum = Math.floor(Math.random() * 1000);
+                        renderIGPostUI(sender, `https://loremflickr.com/400/400/${cleanKeyword}?random=${randomNum}`, caption.trim(), 'web', keyword.trim());
+                    } else {
+                        renderIGPostUI(sender, '', caption.trim(), 'local', keyword.trim());
+                    }
+                    hasNotification = true; triggerNotification('ig');
+                    processedMatches.push(match);
                 }
-                hasNotification = true; triggerNotification('ig');
                 return `<span style="display:none;">${match}</span>`;
             });
 
             // 5.5 IG Comment
             text = text.replace(/\[IG\|comment\|(?:(.*?)\|)?(.*?)\]/gi, (match, nameOpt, commentText) => {
-                const sender = nameOpt ? nameOpt.trim() : (getContext().name2 || "Unknown");
-                if (latestPostId) {
-                    saveIGCommentToStorage(latestPostId, { name: sender, text: commentText.trim() });
-                    addCommentToUI_NoSave(latestPostId, sender, commentText.trim());
-                    hasNotification = true; triggerNotification('ig');
+                if (!processedMatches.includes(match)) {
+                    const sender = nameOpt ? nameOpt.trim() : (getContext().name2 || "Unknown");
+                    if (latestPostId) {
+                        saveIGCommentToStorage(latestPostId, { name: sender, text: commentText.trim() });
+                        addCommentToUI_NoSave(latestPostId, sender, commentText.trim());
+                        hasNotification = true; triggerNotification('ig');
+                    }
+                    processedMatches.push(match);
                 }
                 return `<span style="display:none;">${match}</span>`;
             });
 
             // 6. Twitter Post
             text = text.replace(/\[Twitter\|post\|(.*?)\]/gi, (match, twText) => {
-                const sender = getContext().name2 || "Unknown";
-                renderTwitterPostUI(sender, twText.trim());
-                hasNotification = true; triggerNotification('twitter');
+                if (!processedMatches.includes(match)) {
+                    const sender = getContext().name2 || "Unknown";
+                    renderTwitterPostUI(sender, twText.trim());
+                    hasNotification = true; triggerNotification('twitter');
+                    processedMatches.push(match);
+                }
                 return `<span style="display:none;">${match}</span>`;
             });
 
             // 6.5 Twitter Reply
             text = text.replace(/\[Twitter\|reply\|(.*?)\]/gi, (match, replyText) => {
-                const sender = getContext().name2 || "Unknown";
-                if (latestTweetId) {
-                    saveTwitterReply(latestTweetId, { name: sender, text: replyText.trim() });
-                    addTwitterReplyToUI_NoSave(latestTweetId, sender, replyText.trim());
-                    hasNotification = true; triggerNotification('twitter');
+                if (!processedMatches.includes(match)) {
+                    const sender = getContext().name2 || "Unknown";
+                    if (latestTweetId) {
+                        saveTwitterReply(latestTweetId, { name: sender, text: replyText.trim() });
+                        addTwitterReplyToUI_NoSave(latestTweetId, sender, replyText.trim());
+                        hasNotification = true; triggerNotification('twitter');
+                    }
+                    processedMatches.push(match);
                 }
                 return `<span style="display:none;">${match}</span>`;
             });
 
-            // อัปเดตข้อความบนหน้าจอ ถ้ามีการซ่อนฟอร์แมต
+            // อัปเดตข้อความบนหน้าจอ และเซฟสมุดจดบันทึก
             if (text !== originalText) {
                 msgElement.innerHTML = text;
-                msgElement.dataset.lastProcessedHtml = text; // จำข้อความที่ซ่อนแล้ว
+                msgElement.dataset.lastProcessedHtml = text;
             } else {
-                msgElement.dataset.lastProcessedHtml = currentHtml; // จำข้อความเดิม
+                msgElement.dataset.lastProcessedHtml = currentHtml;
             }
+
+            // เก็บสมุดจดบันทึกคืนเข้าไปใน HTML
+            msgElement.dataset.processedMatches = JSON.stringify(processedMatches);
         });
-    }, 500); // ปรับให้เช็คไวขึ้นเป็นทุกๆ ครึ่งวินาที เพื่อให้เนียนไปกับ Streaming
+    }, 500);
 
     // โหลดข้อมูลเริ่มต้น
     loadLineHistoryForCurrentChar();
     updateLineChatList();
     loadIGHistoryForCurrentChar();
-}
 
 function handleNewMessage(messageId) {
     const msgElement = document.querySelector(`.mes[mesid="${messageId}"] .mes_text`);
