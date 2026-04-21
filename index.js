@@ -1040,21 +1040,21 @@ function setupSettingsMenu() {
     `;
 
     // หาตำแหน่งที่จะใส่เมนู (SillyTavern มีแท็บ Extensions)
-    const extensionPanel = document.getElementById('extensions_settings');
-    if (extensionPanel) {
-        const container = document.createElement('div');
-        container.innerHTML = settingsHtml;
-        extensionPanel.appendChild(container);
+//    const extensionPanel = document.getElementById('extensions_settings');
+//    if (extensionPanel) {
+//        const container = document.createElement('div');
+//       container.innerHTML = settingsHtml;
+//        extensionPanel.appendChild(container);
 
         // ผูก Event ให้ปุ่มใน Settings
-        document.getElementById('btn-toggle-phone')?.addEventListener('click', togglePhone);
-        document.getElementById('btn-toggle-fab')?.addEventListener('click', toggleFabVisibility);
+//       document.getElementById('btn-toggle-phone')?.addEventListener('click', togglePhone);
+//        document.getElementById('btn-toggle-fab')?.addEventListener('click', toggleFabVisibility);
 
         // ปุ่มทดสอบการแจ้งเตือน
-        document.getElementById('btn-test-notification')?.addEventListener('click', () => {
-            triggerNotification();
-        });
-    }
+//        document.getElementById('btn-test-notification')?.addEventListener('click', () => {
+//            triggerNotification();
+//        });
+//    }
 
     // Event สำหรับ Export
     document.getElementById('btn-export-line')?.addEventListener('click', () => {
